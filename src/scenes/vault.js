@@ -185,6 +185,104 @@ function drawCamera(ctx, x, y, s, angle, time, alarmed) {
   ctx.restore();
 }
 
+// Wall keypad beside the vault: digits scramble and lock in as the drill gets through.
+function drawKeypad(ctx, x, y, s, progress, open, time) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  const W = 46, H = 70;
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fillRect(-W / 2 + 4, -H / 2 + 5, W, H);
+  ctx.fillStyle = 'rgba(6,8,12,0.95)';
+  rr(ctx, -W / 2 - 1.5, -H / 2 - 1.5, W + 3, H + 3, 6); ctx.fill();
+  const g = ctx.createLinearGradient(0, -H / 2, 0, H / 2);
+  g.addColorStop(0, '#4a5560'); g.addColorStop(1, '#1e252c');
+  ctx.fillStyle = g;
+  rr(ctx, -W / 2, -H / 2, W, H, 5); ctx.fill();
+  // screen
+  ctx.fillStyle = '#04110a';
+  rr(ctx, -W / 2 + 4, -H / 2 + 5, W - 8, 16, 2); ctx.fill();
+  ctx.font = '700 9px "Chakra Petch", monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const code = '739184';
+  for (let i = 0; i < 6; i++) {
+    const locked = open || progress > (i + 1) / 7;
+    const ch = locked ? code[i] : String(Math.floor(hash(Math.floor(time * 18) + i * 13, 7) * 10));
+    ctx.fillStyle = locked ? '#59e39a' : '#ffb347';
+    ctx.fillText(ch, -W / 2 + 9 + i * 6.3, -H / 2 + 13.5);
+  }
+  // keys
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) {
+    const kx = -W / 2 + 8 + c * 11.5, ky = -H / 2 + 27 + r * 9;
+    const pressed = !open && progress < 1 && Math.floor(time * 9) % 12 === r * 3 + c;
+    ctx.fillStyle = pressed ? '#ffd77a' : '#11161b';
+    rr(ctx, kx - 1, ky - 1, 9, 7, 1.5); ctx.fill();
+    ctx.fillStyle = pressed ? '#fff4c4' : '#39424c';
+    rr(ctx, kx, ky, 7, 5, 1.2); ctx.fill();
+  }
+  // status
+  const ok = open || progress >= 1;
+  const blink = Math.floor(time * 6) % 2 === 0;
+  ctx.fillStyle = ok ? '#59e39a' : blink ? '#ff4d4d' : '#5a1414';
+  ctx.beginPath(); ctx.arc(-W / 2 + 8, H / 2 - 5, 2.4, 0, TAU); ctx.fill();
+  ctx.fillStyle = ok ? '#59e39a' : '#ff8a8a';
+  ctx.font = '800 6.5px "Chakra Petch", system-ui, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(ok ? 'OPEN' : 'LOCKED', -W / 2 + 13, H / 2 - 4.8);
+  ctx.restore();
+  if (ok) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const gl = ctx.createRadialGradient(x, y, 0, x, y, 60 * s);
+    gl.addColorStop(0, 'rgba(89,227,154,0.25)');
+    gl.addColorStop(1, 'rgba(89,227,154,0)');
+    ctx.fillStyle = gl;
+    ctx.fillRect(x - 60 * s, y - 60 * s, 120 * s, 120 * s);
+    ctx.restore();
+  }
+}
+
+// Dark shapes rushing past in front of the camera, for depth.
+function drawForeground(ctx, type, w, h, scroll) {
+  const P = w * 1.25;
+  const s = scroll * 1.8;
+  const start = Math.floor(s / P), off = s - start * P;
+  for (let k = -1; k <= 1; k++) {
+    const n = start + k;
+    if (hash(n, 131) < 0.4) continue;
+    const x = k * P - off + P * 0.5;
+    if (x < -h * 0.4 || x > w + h * 0.4) continue;
+    ctx.save();
+    ctx.globalAlpha = 0.92;
+    if (type === 'vault' || type === 'hall') {
+      const pw = h * 0.14;
+      const g = ctx.createLinearGradient(x, 0, x + pw, 0);
+      const mid = type === 'vault' ? '#10302c' : '#3a2a20';
+      g.addColorStop(0, '#020606'); g.addColorStop(0.45, mid); g.addColorStop(1, '#020404');
+      ctx.fillStyle = g;
+      ctx.fillRect(x, -10, pw, h + 20);
+      ctx.fillStyle = type === 'vault' ? 'rgba(232,178,74,0.55)' : 'rgba(214,170,80,0.6)';
+      ctx.fillRect(x - 4, h * 0.2, pw + 8, h * 0.02);
+      ctx.fillRect(x - 4, h * 0.82, pw + 8, h * 0.02);
+    } else if (type === 'street') {
+      ctx.fillStyle = '#05060c';
+      ctx.fillRect(x, -10, h * 0.035, h + 20);
+      ctx.fillRect(x - h * 0.02, h * 0.86, h * 0.075, h * 0.2);
+      ctx.fillStyle = 'rgba(255,214,140,0.5)';
+      ctx.fillRect(x + h * 0.005, h * 0.3, h * 0.025, h * 0.03);
+    } else {
+      ctx.fillStyle = '#07040c';
+      ctx.fillRect(x, h * 0.62, h * 0.18, h * 0.5);
+      ctx.fillRect(x - h * 0.015, h * 0.6, h * 0.21, h * 0.035);
+      ctx.fillRect(x + h * 0.14, h * 0.3, h * 0.012, h * 0.32);
+      ctx.fillStyle = Math.sin(scroll * 0.01 + n) > 0 ? '#ff4040' : '#4a1010';
+      ctx.beginPath(); ctx.arc(x + h * 0.146, h * 0.3, h * 0.008, 0, TAU); ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
 function drawCuffs(ctx, x, y, r) {
   if (r <= 0) return;
   ctx.save();
@@ -446,8 +544,11 @@ export function createVaultScene() {
       if (v.phase === 'betting') {
         drawCamera(ctx, w * 0.1, h * 0.12, h * 0.0024, 0.6 + Math.sin(time * 0.8) * 0.35, time, false);
         drawDoor(ctx, doorBase, doorY, doorR, v.betProgress * TAU * 1.5, v.betProgress, 0, time);
+        drawKeypad(ctx, doorBase + doorR * 1.55, doorY - doorR * 0.35, h * 0.0034, v.betProgress, false, time);
       } else if (running && scroll - scrollAtStart < w * 1.6) {
-        drawDoor(ctx, doorBase - (scroll - scrollAtStart), doorY, doorR, 1.5 * TAU, 1, easeOut((time - launchTime) / 0.5) * 1.5, time);
+        const dx0 = doorBase - (scroll - scrollAtStart);
+        drawDoor(ctx, dx0, doorY, doorR, 1.5 * TAU, 1, easeOut((time - launchTime) / 0.5) * 1.5, time);
+        drawKeypad(ctx, dx0 + doorR * 1.55, doorY - doorR * 0.35, h * 0.0034, 1, true, time);
       }
 
       const info = { w, h, floorY, gy, rx, time };
@@ -624,6 +725,29 @@ export function createVaultScene() {
         drawCuffs(ctx, r.handX, r.handY, h * 0.018 * easeOutBack(clamp((tcr - 0.55) / 0.25, 0, 1)));
       }
 
+      // headlamp on the beanie lights up the door while he drills
+      if (v.phase === 'betting') {
+        const lx = r.headX + 8 * sc, ly = r.headY - 16 * sc;
+        const tx2 = doorBase - doorR * 0.2, ty2 = doorY + doorR * 0.1;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const hg = ctx.createLinearGradient(lx, ly, tx2, ty2);
+        hg.addColorStop(0, 'rgba(255,248,215,0.35)');
+        hg.addColorStop(1, 'rgba(255,248,215,0.04)');
+        ctx.fillStyle = hg;
+        ctx.beginPath(); ctx.moveTo(lx, ly - 2); ctx.lineTo(tx2, ty2 - doorR * 0.55); ctx.lineTo(tx2, ty2 + doorR * 0.55); ctx.lineTo(lx, ly + 2); ctx.closePath(); ctx.fill();
+        const pg = ctx.createRadialGradient(tx2, ty2, 0, tx2, ty2, doorR * 0.6);
+        pg.addColorStop(0, 'rgba(255,248,215,0.22)');
+        pg.addColorStop(1, 'rgba(255,248,215,0)');
+        ctx.fillStyle = pg;
+        ctx.fillRect(tx2 - doorR * 0.6, ty2 - doorR * 0.6, doorR * 1.2, doorR * 1.2);
+        ctx.restore();
+        ctx.fillStyle = 'rgba(6,8,12,0.9)';
+        ctx.beginPath(); ctx.arc(lx, ly, 4.2 * sc * 1.16, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#fffbe0';
+        ctx.beginPath(); ctx.arc(lx + 0.6 * sc, ly, 2.8 * sc * 1.16, 0, TAU); ctx.fill();
+      }
+
       // drill sparks during the countdown
       if (v.phase === 'betting') {
         const tipX = r.handX + 36 * sc, tipY = r.handY - 4 * sc;
@@ -659,6 +783,8 @@ export function createVaultScene() {
           fx.add({ kind: 'bill', x: r.bagX, y: r.bagY, vx: -w * (0.05 + Math.random() * 0.1), vy: -h * (0.1 + Math.random() * 0.25), g: h * 0.3, drag: 1, life: 2.2, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 8, r: h * 0.016, scroll: 0.6 });
         }
       }
+
+      if (running && !reduced) drawForeground(ctx, here, w, h, scroll);
 
       // rain on the street
       rain = clamp(rain + dt * (here === 'street' && v.phase !== 'betting' ? 0.6 : -0.8), 0, 1);
