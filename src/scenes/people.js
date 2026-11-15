@@ -766,130 +766,267 @@ export function drawPerson(ctx, x, y, sc, o) {
   };
 }
 
-// K9 police dog (German Shepherd). Faces right.
+// K9 police dog (German Shepherd) with a proper gallop. Faces right; feet on y=0.
 export function drawDog(ctx, x, y, sc, o = {}) {
   const ph = o.ph || 0, t = o.t || 0;
   const run = o.pose !== 'sit';
+  const bark = o.pose === 'bark';
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(sc, sc);
-  const sg = ctx.createRadialGradient(4, 1, 2, 4, 1, 40);
-  sg.addColorStop(0, 'rgba(0,0,0,0.45)');
+  const sg = ctx.createRadialGradient(2, 1, 2, 2, 1, 44);
+  sg.addColorStop(0, 'rgba(0,0,0,0.5)');
   sg.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = sg;
-  ctx.beginPath(); ctx.ellipse(4, 1, 40, 6, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(2, 1, 44, 6.5, 0, 0, TAU); ctx.fill();
 
-  const bob = run ? Math.sin(ph * 2) * 2.8 : 0;
-  const tan = '#c88a4a', tanD = '#94612f', black = '#1c1510';
-  const g = run ? 1 : 0;
-  const leg = (bx, by, a1, a2, col, back) => {
-    const k = joint(bx, by, a1, back ? 13 : 12);
-    const p = joint(k[0], k[1], a2, back ? 13 : 12.5);
-    hiLimb(ctx, [[bx, by], k, p], back ? 7 : 6, col);
+  const g = run ? 1 : 0.15;
+  const p = ph;
+  const bob = run ? -Math.abs(Math.sin(p)) * 3.5 + 1.5 : Math.sin(t * 3) * 0.6;
+  const stretch = run ? 1 + 0.09 * Math.sin(p - 0.6) : 1;
+  const fx = 17 * stretch, hx = -17 * stretch;
+  const tan = '#cf8f4c', tanL = '#e8b474', tanD = '#9a6230', black = '#19120d', cream = '#f2d7a8';
+
+  const paw = (pw, col) => {
     ctx.fillStyle = INK;
-    ctx.beginPath(); ctx.ellipse(p[0] + 2.5, p[1] + 0.5, 5, 3.6, 0, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(pw[0] + 2.6, pw[1] + 0.4, 5.6, 3.8, 0, 0, TAU); ctx.fill();
     ctx.fillStyle = col;
-    ctx.beginPath(); ctx.ellipse(p[0] + 2.5, p[1], 3.8, 2.5, 0, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(pw[0] + 2.6, pw[1], 4.3, 2.7, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(pw[0] + 4, pw[1] - 1.5); ctx.lineTo(pw[0] + 4.4, pw[1] + 1.5); ctx.moveTo(pw[0] + 5.8, pw[1] - 1.2); ctx.lineTo(pw[0] + 6, pw[1] + 1.4); ctx.stroke();
   };
-  // gallop: the back pair lags the front pair
-  const fa = (off) => Math.sin(ph + off) * 1.05 * g;
-  const ba = (off) => Math.sin(ph + Math.PI * 0.85 + off) * 1.0 * g;
-  leg(-19, -28 + bob, ba(0.5), ba(0.5) - 0.9 * g - 0.2, shade(tanD, 0.8), true);
-  leg(16, -26 + bob, fa(0.5), fa(0.5) + 0.35 * g, shade(tanD, 0.8), false);
+  const frontLeg = (off, col) => {
+    const q = p + off;
+    const up = Math.sin(q) * 0.95 * g + 0.05;
+    const fold = Math.max(0, Math.cos(q)) * 1.5 * g;
+    const s0 = [fx + 2, -28 + bob];
+    const el = joint(s0[0], s0[1], up, 13);
+    const wr = joint(el[0], el[1], up - fold, 11);
+    const pw = joint(wr[0], wr[1], up - fold * 0.3 + 0.3, 4);
+    hiLimb(ctx, [s0, el, wr, pw], 6.8, col);
+    paw(pw, col);
+  };
+  const backLeg = (off, col) => {
+    const q = p + Math.PI * 0.9 + off;
+    const th = 0.45 + Math.sin(q) * 0.8 * g;
+    const h0 = [hx, -30 + bob];
+    const kn = joint(h0[0], h0[1], th, 13);
+    const hk = joint(kn[0], kn[1], th - 1.35, 11);
+    const pw = joint(hk[0], hk[1], th - 0.2 - Math.max(0, Math.cos(q)) * 0.5 * g, 9);
+    hiLimb(ctx, [h0, kn, hk, pw], 7.4, col);
+    paw(pw, col);
+  };
 
-  // bushy tail
-  const wag = Math.sin(t * 13) * 5;
-  const tail = [[-24, -36 + bob], [-36, -40 + bob + wag * 0.4], [-48, -32 + bob + wag]];
-  limb(ctx, tail, 13, INK);
-  limb(ctx, tail, 10, tanD);
-  limb(ctx, [tail[1], tail[2]], 7, black);
+  // far legs
+  backLeg(0.45, shade(tanD, 0.78));
+  frontLeg(0.45, shade(tanD, 0.78));
 
-  // body
+  // bushy tail, streaming with the run
+  const tw = Math.sin(t * (run ? 9 : 4)) * (run ? 4 : 2);
+  const tail = [[hx - 5, -41 + bob], [hx - 17, -44 + bob + tw * 0.4], [hx - 29, -39 + bob + tw], [hx - 37, -33 + bob + tw * 1.3]];
+  for (let i = 0; i < 3; i++) limb(ctx, [tail[i], tail[i + 1]], 15 - i * 3, INK);
+  for (let i = 0; i < 3; i++) limb(ctx, [tail[i], tail[i + 1]], 11.5 - i * 2.8, i < 2 ? tanD : black);
+  limb(ctx, [tail[0], tail[1], tail[2]], 4.5, black);
+
+  // body: deep chest, tucked waist
   const body = () => {
     ctx.beginPath();
-    ctx.moveTo(19, -46 + bob);
-    ctx.quadraticCurveTo(-2, -45 + bob, -22, -40 + bob);
-    ctx.quadraticCurveTo(-31, -33 + bob, -25, -23 + bob);
-    ctx.quadraticCurveTo(-12, -21 + bob, -2, -25 + bob);
-    ctx.quadraticCurveTo(12, -15 + bob, 23, -24 + bob);
-    ctx.quadraticCurveTo(30, -35 + bob, 19, -46 + bob);
+    ctx.moveTo(fx + 4, -47 + bob);
+    ctx.bezierCurveTo(fx - 10, -49 + bob, hx + 8, -45 + bob, hx - 2, -43 + bob);
+    ctx.quadraticCurveTo(hx - 12, -39 + bob, hx - 8, -26 + bob);
+    ctx.quadraticCurveTo(hx + 6, -20 + bob, 0, -25 + bob);
+    ctx.quadraticCurveTo(fx - 4, -15 + bob, fx + 8, -22 + bob);
+    ctx.quadraticCurveTo(fx + 15, -34 + bob, fx + 4, -47 + bob);
     ctx.closePath();
   };
-  ctx.fillStyle = INK;
-  ctx.lineWidth = 3.2;
+  ctx.lineWidth = 3.4;
   ctx.strokeStyle = INK;
   body();
   ctx.stroke();
-  const bg = ctx.createLinearGradient(0, -46 + bob, 0, -18 + bob);
-  bg.addColorStop(0, tan);
+  const bg = ctx.createLinearGradient(0, -49 + bob, 0, -16 + bob);
+  bg.addColorStop(0, tanL);
+  bg.addColorStop(0.5, tan);
   bg.addColorStop(1, tanD);
   ctx.fillStyle = bg;
   ctx.fill();
   ctx.save();
   body();
   ctx.clip();
+  // black saddle and a light chest
   ctx.fillStyle = black;
-  ctx.beginPath(); ctx.ellipse(-4, -44 + bob, 24, 8, -0.05, 0, TAU); ctx.fill();
-  ctx.fillStyle = '#efcf9e';
-  ctx.beginPath(); ctx.ellipse(18, -20 + bob, 9, 6, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(-3, -47 + bob, 27, 9.5, -0.04, 0, TAU); ctx.fill();
+  ctx.fillStyle = cream;
+  ctx.beginPath(); ctx.ellipse(fx + 6, -22 + bob, 8, 7, 0.3, 0, TAU); ctx.fill();
   ctx.restore();
-  // K9 harness
+  // chest ruff
+  ctx.fillStyle = cream;
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(fx + 9, -40 + bob);
+  for (let i = 0; i < 5; i++) { ctx.lineTo(fx + 14 - i * 0.6, -37 + i * 3.4 + bob); ctx.lineTo(fx + 10.5 - i * 0.4, -35.5 + i * 3.4 + bob); }
+  ctx.lineTo(fx + 6, -22 + bob);
+  ctx.closePath();
+  ctx.fill();
+
+  // police harness
   ctx.fillStyle = INK;
-  rr(ctx, -9, -44 + bob, 20, 16, 3.5); ctx.fill();
-  ctx.fillStyle = '#1b2a5a';
-  rr(ctx, -8, -43 + bob, 18, 14, 3); ctx.fill();
-  ctx.fillStyle = '#f5c84c';
+  rr(ctx, -10, -47 + bob, 23, 18, 4); ctx.fill();
+  const hgr = ctx.createLinearGradient(0, -46 + bob, 0, -30 + bob);
+  hgr.addColorStop(0, '#2a3f86'); hgr.addColorStop(1, '#14204a');
+  ctx.fillStyle = hgr;
+  rr(ctx, -9, -46 + bob, 21, 16, 3.5); ctx.fill();
+  ctx.fillStyle = '#e8ff5a';
+  ctx.fillRect(-9, -34.5 + bob, 21, 2.2);
+  ctx.fillStyle = '#ffffff';
   ctx.font = '900 7.5px system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('K9', 1, -36 + bob);
-  ctx.fillStyle = '#0f1a3a';
-  ctx.fillRect(11, -42 + bob, 3, 14);
+  ctx.fillText('K9', 0, -40.5 + bob);
+  ctx.fillStyle = '#f5c84c';
+  ctx.beginPath(); ctx.arc(8.2, -40.5 + bob, 2.3, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#101a3c';
+  ctx.fillRect(fx - 3, -44 + bob, 3.5, 20);
 
-  leg(-16, -26 + bob, ba(0), ba(0) - 0.9 * g - 0.2, tanD, true);
-  leg(19, -25 + bob, fa(0), fa(0) + 0.35 * g, tan, false);
-
-  // neck + head
-  const hx = 31, hy = -52 + bob;
-  ctx.fillStyle = INK;
-  ctx.beginPath(); ctx.moveTo(14, -45 + bob); ctx.lineTo(hx - 4, hy - 7); ctx.lineTo(hx + 4, hy + 6); ctx.lineTo(25, -30 + bob); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = tan;
-  ctx.beginPath(); ctx.moveTo(16, -43 + bob); ctx.lineTo(hx - 3, hy - 5); ctx.lineTo(hx + 3, hy + 5); ctx.lineTo(24, -32 + bob); ctx.closePath(); ctx.fill();
-  // ears
-  for (const [ex, tip] of [[-5, -5], [1, 0]]) {
+  // near legs, then the muscles over them
+  backLeg(0, tanD);
+  frontLeg(0, tan);
+  for (const [mx, my, rx2, ry2, rot] of [[hx + 1, -33, 11, 10, -0.35], [fx - 1, -35, 8.5, 10, 0.2]]) {
     ctx.fillStyle = INK;
-    ctx.beginPath(); ctx.moveTo(hx + ex - 5, hy - 4); ctx.lineTo(hx + ex + tip, hy - 21); ctx.lineTo(hx + ex + 6, hy - 5); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = black;
-    ctx.beginPath(); ctx.moveTo(hx + ex - 3.5, hy - 4.5); ctx.lineTo(hx + ex + tip, hy - 18.5); ctx.lineTo(hx + ex + 4.5, hy - 5.5); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#c47a6a';
-    ctx.beginPath(); ctx.moveTo(hx + ex - 1.5, hy - 6); ctx.lineTo(hx + ex + tip * 0.8, hy - 14); ctx.lineTo(hx + ex + 2.5, hy - 6.5); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(mx, my + bob, rx2 + 1.4, ry2 + 1.4, rot, 0, TAU); ctx.fill();
+    const mg = ctx.createRadialGradient(mx + 2, my - 3 + bob, 1, mx, my + bob, rx2 + 2);
+    mg.addColorStop(0, tanL); mg.addColorStop(1, tanD);
+    ctx.fillStyle = mg;
+    ctx.beginPath(); ctx.ellipse(mx, my + bob, rx2, ry2, rot, 0, TAU); ctx.fill();
   }
-  // skull + muzzle
-  ctx.fillStyle = INK;
-  ctx.beginPath(); ctx.ellipse(hx, hy, 11, 9.5, 0, 0, TAU); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(hx + 4, hy - 6); ctx.lineTo(hx + 22, hy - 1); ctx.quadraticCurveTo(hx + 24, hy + 5, hx + 19, hy + 6); ctx.lineTo(hx + 4, hy + 7); ctx.closePath(); ctx.fill();
+  // harness straps back over the shoulder
+  ctx.fillStyle = '#14204a';
+  ctx.fillRect(fx - 4, -44 + bob, 3, 13);
+
+  // neck
+  const hx0 = fx + 18, hy0 = -57 + bob * 0.6 + (run ? Math.sin(p * 2) * 1.1 : 0);
+  const neck = () => {
+    ctx.beginPath();
+    ctx.moveTo(fx - 2, -46 + bob);
+    ctx.quadraticCurveTo(fx + 6, -56 + bob, hx0 - 6, hy0 - 6);
+    ctx.lineTo(hx0 + 3, hy0 + 8);
+    ctx.quadraticCurveTo(fx + 12, -36 + bob, fx + 9, -30 + bob);
+    ctx.closePath();
+  };
+  ctx.lineWidth = 3.2;
+  ctx.strokeStyle = INK;
+  neck();
+  ctx.stroke();
   ctx.fillStyle = tan;
-  ctx.beginPath(); ctx.ellipse(hx, hy, 9.6, 8.2, 0, 0, TAU); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(hx + 4, hy - 4.8); ctx.lineTo(hx + 21, hy - 0.2); ctx.quadraticCurveTo(hx + 22.5, hy + 4, hx + 18.5, hy + 4.8); ctx.lineTo(hx + 4, hy + 5.8); ctx.closePath(); ctx.fill();
+  ctx.fill();
+  ctx.save();
+  neck();
+  ctx.clip();
   ctx.fillStyle = black;
-  ctx.beginPath(); ctx.moveTo(hx + 8, hy - 3.6); ctx.lineTo(hx + 21, hy - 0.2); ctx.quadraticCurveTo(hx + 22.5, hy + 4, hx + 18.5, hy + 4.8); ctx.lineTo(hx + 8, hy + 4); ctx.closePath(); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(hx + 1, hy - 5, 7, 3.5, -0.2, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(fx + 2, -52 + bob, 9, 6, -0.7, 0, TAU); ctx.fill();
+  ctx.restore();
+  // collar + tag
+  ctx.save();
+  ctx.translate(fx + 9, -44 + bob);
+  ctx.rotate(-0.55);
+  ctx.fillStyle = INK;
+  rr(ctx, -2.8, -9, 5.6, 18, 2); ctx.fill();
+  ctx.fillStyle = '#d63a3a';
+  rr(ctx, -1.8, -8, 3.6, 16, 1.5); ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = INK;
+  ctx.beginPath(); ctx.arc(fx + 13, -38 + bob, 3.4, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#ffd34d';
+  ctx.beginPath(); ctx.arc(fx + 13, -38 + bob, 2.4, 0, TAU); ctx.fill();
+
+  // head
+  const hx2 = hx0, hy2 = hy0;
+  // ears
+  for (const [ex, tipx, col] of [[-7, -7, shade(black, 1)], [0, 2.5, black]]) {
+    ctx.fillStyle = INK;
+    ctx.beginPath(); ctx.moveTo(hx2 + ex - 6, hy2 - 4); ctx.quadraticCurveTo(hx2 + ex - 3, hy2 - 18, hx2 + tipx, hy2 - 26); ctx.quadraticCurveTo(hx2 + ex + 7, hy2 - 14, hx2 + ex + 7, hy2 - 4); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.moveTo(hx2 + ex - 4.5, hy2 - 4.5); ctx.quadraticCurveTo(hx2 + ex - 2, hy2 - 17, hx2 + tipx, hy2 - 23.5); ctx.quadraticCurveTo(hx2 + ex + 5.6, hy2 - 13.5, hx2 + ex + 5.6, hy2 - 5); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#d8916f';
+    ctx.beginPath(); ctx.moveTo(hx2 + ex - 2, hy2 - 6); ctx.quadraticCurveTo(hx2 + ex - 0.5, hy2 - 14, hx2 + tipx * 0.9 + ex * 0.1, hy2 - 18); ctx.quadraticCurveTo(hx2 + ex + 3.6, hy2 - 12, hx2 + ex + 3.4, hy2 - 6.5); ctx.closePath(); ctx.fill();
+  }
+  // skull
+  ctx.fillStyle = INK;
+  ctx.beginPath(); ctx.ellipse(hx2, hy2, 12.6, 11, 0, 0, TAU); ctx.fill();
+  const sk = ctx.createRadialGradient(hx2 + 3, hy2 - 4, 1, hx2, hy2, 13);
+  sk.addColorStop(0, tanL); sk.addColorStop(1, tan);
+  ctx.fillStyle = sk;
+  ctx.beginPath(); ctx.ellipse(hx2, hy2, 11.2, 9.6, 0, 0, TAU); ctx.fill();
+  // fluffy cheek
+  ctx.fillStyle = cream;
+  ctx.beginPath();
+  ctx.moveTo(hx2 - 9, hy2 + 1);
+  for (let i = 0; i < 4; i++) { ctx.lineTo(hx2 - 8 + i * 3, hy2 + 9 + (i % 2) * 2); }
+  ctx.lineTo(hx2 + 4, hy2 + 5);
+  ctx.closePath();
+  ctx.fill();
+  // dark cap
+  ctx.fillStyle = black;
+  ctx.beginPath(); ctx.ellipse(hx2 - 1, hy2 - 6, 8.5, 4, -0.15, 0, TAU); ctx.fill();
+  // muzzle (black mask)
+  const open = run || bark ? (bark ? 4.5 : 2.5) : 0.6;
+  const muz = () => {
+    ctx.beginPath();
+    ctx.moveTo(hx2 + 4, hy2 - 6);
+    ctx.quadraticCurveTo(hx2 + 16, hy2 - 5, hx2 + 25, hy2 - 1);
+    ctx.quadraticCurveTo(hx2 + 27.5, hy2 + 3, hx2 + 23, hy2 + 4);
+    ctx.lineTo(hx2 + 6, hy2 + 6);
+    ctx.closePath();
+  };
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = INK;
+  muz();
+  ctx.stroke();
+  const mz = ctx.createLinearGradient(hx2 + 4, 0, hx2 + 26, 0);
+  mz.addColorStop(0, '#5a3a20'); mz.addColorStop(0.45, '#241812'); mz.addColorStop(1, '#0c0806');
+  ctx.fillStyle = mz;
+  ctx.fill();
+  // lower jaw, teeth and tongue
+  ctx.fillStyle = INK;
+  ctx.beginPath(); ctx.moveTo(hx2 + 6, hy2 + 5); ctx.lineTo(hx2 + 22, hy2 + 4.5); ctx.quadraticCurveTo(hx2 + 21, hy2 + 7 + open, hx2 + 17, hy2 + 7.5 + open); ctx.lineTo(hx2 + 7, hy2 + 8 + open * 0.6); ctx.closePath(); ctx.fill();
+  if (open > 1) {
+    ctx.fillStyle = '#5a1418';
+    ctx.beginPath(); ctx.moveTo(hx2 + 8, hy2 + 5.6); ctx.lineTo(hx2 + 20.5, hy2 + 5.2); ctx.quadraticCurveTo(hx2 + 19.5, hy2 + 6 + open, hx2 + 16, hy2 + 6.5 + open); ctx.lineTo(hx2 + 8.5, hy2 + 7 + open * 0.5); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fff';
+    for (const tx3 of [12, 16, 19.5]) { ctx.beginPath(); ctx.moveTo(tx3 + hx2, hy2 + 5.2); ctx.lineTo(tx3 + hx2 + 1, hy2 + 7.2); ctx.lineTo(tx3 + hx2 + 2, hy2 + 5.2); ctx.closePath(); ctx.fill(); }
+    const flap = Math.sin(t * 16) * 1.4;
+    ctx.fillStyle = INK;
+    ctx.beginPath(); ctx.ellipse(hx2 + 13, hy2 + 11 + open * 0.6 + flap, 3.8, 5.8, 0.3, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#f07a90';
+    ctx.beginPath(); ctx.ellipse(hx2 + 13, hy2 + 11 + open * 0.6 + flap, 2.8, 4.8, 0.3, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(160,40,60,0.6)';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(hx2 + 13, hy2 + 8 + open * 0.6 + flap); ctx.lineTo(hx2 + 13.6, hy2 + 13 + open * 0.6 + flap); ctx.stroke();
+  }
+  // nose
   ctx.fillStyle = '#050505';
-  ctx.beginPath(); ctx.ellipse(hx + 21, hy + 0.5, 3.2, 2.6, 0, 0, TAU); ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,0.4)';
-  ctx.beginPath(); ctx.arc(hx + 21.5, hy - 0.4, 0.9, 0, TAU); ctx.fill();
-  // amber eye
+  ctx.beginPath(); ctx.ellipse(hx2 + 25, hy2 + 0.2, 3.8, 3.1, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.beginPath(); ctx.ellipse(hx2 + 25.6, hy2 - 0.9, 1.3, 0.8, 0, 0, TAU); ctx.fill();
+  // amber eye with a brow ridge
+  ctx.fillStyle = INK;
+  ctx.beginPath(); ctx.ellipse(hx2 + 5.5, hy2 - 2.2, 3.6, 2.8, -0.2, 0, TAU); ctx.fill();
   ctx.fillStyle = '#e8a83a';
-  ctx.beginPath(); ctx.ellipse(hx + 5, hy - 2, 2.4, 2, 0, 0, TAU); ctx.fill();
-  ctx.fillStyle = '#111';
-  ctx.beginPath(); ctx.arc(hx + 5.6, hy - 2, 1.2, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(hx2 + 5.5, hy2 - 2.2, 2.7, 2, -0.2, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#120a04';
+  ctx.beginPath(); ctx.arc(hx2 + 6.2, hy2 - 2.1, 1.25, 0, TAU); ctx.fill();
   ctx.fillStyle = '#fff';
-  ctx.beginPath(); ctx.arc(hx + 6, hy - 2.6, 0.5, 0, TAU); ctx.fill();
-  if (run || o.pose === 'bark') {
-    ctx.fillStyle = '#3a0f0f';
-    ctx.beginPath(); ctx.moveTo(hx + 8, hy + 5); ctx.lineTo(hx + 19, hy + 5); ctx.lineTo(hx + 14, hy + 9); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#ef6f86';
-    ctx.beginPath(); ctx.ellipse(hx + 12, hy + 10 + Math.sin(t * 16) * 1.2, 2.8, 4.8, 0.25, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.arc(hx2 + 6.7, hy2 - 2.8, 0.6, 0, TAU); ctx.fill();
+  ctx.strokeStyle = tanL;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.moveTo(hx2 + 2, hy2 - 6.2); ctx.lineTo(hx2 + 8.5, hy2 - 4.8); ctx.stroke();
+  // bark lines
+  if (bark && Math.floor(t * 6) % 2 === 0) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.lineWidth = 1.8;
+    ctx.lineCap = 'round';
+    for (const [dx2, dy2] of [[30, -6], [33, 1], [30, 8]]) { ctx.beginPath(); ctx.moveTo(hx2 + dx2, hy2 + dy2); ctx.lineTo(hx2 + dx2 + 5, hy2 + dy2 * 1.3); ctx.stroke(); }
   }
   ctx.restore();
 }
