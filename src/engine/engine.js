@@ -7,7 +7,7 @@
 
 import { LiveCrashClient, GAME_ID } from '../api/liveCrash';
 import { wallet } from './wallet';
-import { sfx } from './sound';
+import { sfx, music } from './sound';
 import { toast } from './toasts';
 
 // Defaults until the server's config arrives (same values as appsettings.json).
@@ -45,7 +45,8 @@ export function createEngine(id, label) {
     players: new Map(),
     myLog: [],
     mult: 1,
-    limits: { minBet: 1, maxBet: 10000, minAutoCashOut: 1.01, maxMultiplier: 1000 },
+    limits: { minBet: 1, maxBet: 10000, maxWin: 500000, minAutoCashOut: 1.01, maxMultiplier: 1000, slots: 2 },
+    fairness: { hash: '', nonce: null, prevSeed: '', prevHash: '' },
     me: '',
   };
   const settled = new Set();
@@ -70,6 +71,7 @@ export function createEngine(id, label) {
       bots: [...st.players.values()],
       myLog: st.myLog.slice(0, 40),
       limits: { ...st.limits },
+      fairness: { ...st.fairness },
     };
   }
   function emit() {
@@ -92,6 +94,9 @@ export function createEngine(id, label) {
     const prev = st.phase;
     const phase = PHASE[r.status] || 'betting';
     st.roundId = r.id;
+    if (r.serverSeedHash) st.fairness.hash = r.serverSeedHash;
+    st.fairness.nonce = r.nonce ?? null;
+    music.setMode(phase);
     st.phase = phase;
     if (phase === 'betting') {
       st.phaseStart = client.toLocal(r.phaseEndsAt) - BET_MS;
@@ -191,7 +196,11 @@ export function createEngine(id, label) {
     const c = s.config;
     K = c.growthRate;
     BET_MS = c.bettingMs;
-    st.limits = { minBet: c.minBet, maxBet: c.maxBet, minAutoCashOut: c.minAutoCashOut, maxMultiplier: c.maxMultiplier };
+    st.limits = { minBet: c.minBet, maxBet: c.maxBet, maxWin: c.maxWin, minAutoCashOut: c.minAutoCashOut, maxMultiplier: c.maxMultiplier, slots: c.slots };
+    const fair = s.state.fairness || {};
+    st.fairness.hash = fair.currentServerSeedHash || st.fairness.hash;
+    st.fairness.prevSeed = fair.previousServerSeed?.serverSeed || '';
+    st.fairness.prevHash = fair.previousServerSeed?.hash || '';
     st.me = mask(s.player.username || '');
     wallet.setCurrency(s.player.currency);
     wallet.set(s.balance);
@@ -316,6 +325,7 @@ export function createEngine(id, label) {
         if (sec !== lastTickSecond && sec <= 3 && sec > 0) { lastTickSecond = sec; play('tick'); }
       } else if (st.phase === 'running') {
         const m = multAt((now - st.phaseStart) / 1000);
+        music.setMult(m);
         for (const k of SLOT_KEYS) {
           const b = st.bets[k];
           if (b.status === 'live' && !b.busy && b.autoCash && b.serverAuto === null && m >= b.autoCashAt) engine.cashOut(k);

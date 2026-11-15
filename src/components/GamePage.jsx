@@ -4,7 +4,6 @@ import { unlockAudio } from '../engine/sound';
 import { useEngine } from '../hooks';
 import Stage from './Stage';
 import BetPanel from './BetPanel';
-import History from './History';
 import LiveBets from './LiveBets';
 
 export default function GamePage({ game }) {
@@ -35,13 +34,7 @@ export default function GamePage({ game }) {
 
   return (
     <main className="game" id="main" tabIndex={-1}>
-      <div className="game-head">
-        <h1 className="game-title">{game.title}</h1>
-        <p className="game-round">Round {s.roundId}</p>
-      </div>
-      <div className="history-wrap">
-        <History engine={engine} />
-      </div>
+      <h1 className="sr-only">{game.title}</h1>
       <div className="game-grid">
         <div className="play-col">
           <Stage game={game} engine={engine} />

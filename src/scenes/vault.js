@@ -1,670 +1,126 @@
+// Bank Vault Runner: the chase. Draws one frame from the round state `v`.
 import { TAU, clamp, lerp, easeOut, easeOutBack, hash, rr, particles } from './util';
-import { drawPerson, OUTFITS } from './people';
+import { drawPerson, drawDog, drawBag, OUTFITS } from './people';
+import { drawZone, drawGate, ZONE_NAMES } from './zones';
+import { drawTrap, TRAPS } from './traps';
+import { drawPoliceCar, drawMoto, drawHeli } from './vehicles';
+import { sfx } from '../engine/sound';
 
 const C = {
   brass: '#e8b24a', brassDark: '#8c6119',
   gold: '#f7c948', goldDark: '#b07a14', goldLight: '#fff0b8',
-  alarm: '#ff4d4d', alarmOff: '#5a1a1a',
-  steel: '#a9c2bd', steelDark: '#4a6560',
-  laser: '#ff2d55',
+  steel: '#b9d0cb', steelDark: '#3d5551',
 };
+// Where the chase goes as the multiplier climbs.
 const ZONE_AT = [
-  { min: 1.6, type: 'hall' },
-  { min: 3.2, type: 'street' },
+  { min: 1.6, type: 'hall', after: 'vault' },
+  { min: 3.2, type: 'street', after: 'hall' },
+  { min: 8, type: 'roof', after: 'street' },
 ];
-const TRAPS = {
-  vault: [['laserLow', 'jump'], ['laserHigh', 'slide']],
-  hall: [['spikes', 'jump'], ['shutter', 'slide'], ['laserLow', 'jump']],
-  street: [['barrier', 'jump'], ['spikestrip', 'jump'], ['barrier', 'jump']],
-};
+const CHASER_OUTFIT = { guard: OUTFITS.guard, police: OUTFITS.police, police2: OUTFITS.police2, swat: OUTFITS.swat };
+const CHASER_ITEM = { guard: 'flashlight', police: 'flashlight', police2: 'baton', swat: 'shield' };
 
-/* ───────── Backgrounds per zone ───────── */
+/* ───────── Set pieces ───────── */
 
-function drawVaultBG(ctx, w, h, scroll, floorY, alarm) {
-  const wg = ctx.createLinearGradient(0, 0, 0, floorY);
-  wg.addColorStop(0, '#071918');
-  wg.addColorStop(1, '#143a36');
-  ctx.fillStyle = wg;
-  ctx.fillRect(-20, -20, w + 40, floorY + 20);
-  const bw = Math.max(26, h * 0.1), bh = bw * 0.56, gap = Math.max(3, bw * 0.07);
-  const colW = bw + gap, rowH = bh + gap;
-  const bScroll = scroll * 0.3;
-  const off = bScroll % colW;
-  const startCol = Math.floor(bScroll / colW);
-  const top = h * 0.05;
-  const rows = Math.floor((floorY - h * 0.06 - top) / rowH);
-  for (let i = -1; i <= Math.ceil(w / colW) + 1; i++) {
-    const x = i * colW - off;
-    const col = startCol + i;
-    for (let r = 0; r < rows; r++) {
-      const y = top + r * rowH;
-      const open = hash(col * 13 + r, 2) > 0.94;
-      ctx.fillStyle = open ? '#061413' : '#16403b';
-      ctx.fillRect(x, y, bw, bh);
-      if (open) {
-        ctx.fillStyle = 'rgba(247,201,72,0.5)';
-        ctx.fillRect(x + bw * 0.15, y + bh * 0.55, bw * 0.7, bh * 0.3);
-      } else {
-        ctx.fillStyle = '#235f58';
-        ctx.fillRect(x, y, bw, 1.5);
-        ctx.fillStyle = '#0d2a27';
-        ctx.fillRect(x, y + bh - 2, bw, 2);
-        ctx.fillStyle = C.brassDark;
-        ctx.beginPath();
-        ctx.arc(x + bw * 0.84, y + bh * 0.5, Math.max(1.5, bw * 0.045), 0, TAU);
-        ctx.fill();
-      }
-    }
-  }
-  const haze = ctx.createLinearGradient(0, 0, 0, floorY);
-  haze.addColorStop(0, 'rgba(5,18,17,0.55)');
-  haze.addColorStop(0.7, 'rgba(10,32,30,0.25)');
-  haze.addColorStop(1, 'rgba(10,32,30,0.6)');
-  ctx.fillStyle = haze;
-  ctx.fillRect(-20, -20, w + 40, floorY + 20);
-
-  const P = Math.max(260, w * 0.48);
-  const pOff = (scroll * 0.65) % P;
-  const pw = Math.max(26, h * 0.085);
-  for (let i = -1; i <= Math.ceil(w / P) + 1; i++) {
-    const x = i * P - pOff + P * 0.55;
-    const pg = ctx.createLinearGradient(x, 0, x + pw, 0);
-    pg.addColorStop(0, '#0b2321');
-    pg.addColorStop(0.5, '#18403b');
-    pg.addColorStop(1, '#0b2321');
-    ctx.fillStyle = pg;
-    ctx.fillRect(x, 0, pw, floorY);
-    ctx.fillStyle = C.brassDark;
-    ctx.fillRect(x - 3, h * 0.13, pw + 6, h * 0.018);
-    ctx.fillRect(x - 3, floorY - h * 0.05, pw + 6, h * 0.016);
-    alarmLamp(ctx, x + pw / 2, h * 0.13, pw * 0.22, h, alarm);
-  }
-  ctx.fillStyle = '#0a1716';
-  ctx.fillRect(-20, floorY, w + 40, h - floorY + 20);
-  slantLines(ctx, w, h, floorY, scroll, Math.max(40, h * 0.2), '#173330');
-  ctx.fillStyle = 'rgba(232,178,74,0.06)';
-  ctx.fillRect(0, floorY, w, (h - floorY) * 0.25);
-  ctx.fillStyle = '#c9952f';
-  ctx.fillRect(-20, floorY - 2, w + 40, 3);
-}
-
-function drawHallBG(ctx, w, h, scroll, floorY, alarm) {
-  const wg = ctx.createLinearGradient(0, 0, 0, floorY);
-  wg.addColorStop(0, '#1b0d13');
-  wg.addColorStop(1, '#3d1d26');
-  ctx.fillStyle = wg;
-  ctx.fillRect(-20, -20, w + 40, floorY + 20);
-  // arched windows
-  const Wp = Math.max(240, h * 0.85);
-  const wOff = (scroll * 0.3) % Wp;
-  for (let i = -1; i <= Math.ceil(w / Wp) + 1; i++) {
-    const ww = Wp * 0.36;
-    const x = i * Wp - wOff + Wp * 0.32;
-    const top = h * 0.1, bot = floorY - h * 0.24;
-    ctx.beginPath();
-    ctx.moveTo(x, bot);
-    ctx.lineTo(x, top + ww / 2);
-    ctx.arc(x + ww / 2, top + ww / 2, ww / 2, Math.PI, 0);
-    ctx.lineTo(x + ww, bot);
-    ctx.closePath();
-    const g = ctx.createLinearGradient(0, top, 0, bot);
-    g.addColorStop(0, '#0c1630');
-    g.addColorStop(1, '#22336a');
-    ctx.fillStyle = g;
-    ctx.fill();
-    ctx.strokeStyle = '#8c6a2c';
-    ctx.lineWidth = 3;
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x + ww / 2, top);
-    ctx.lineTo(x + ww / 2, bot);
-    ctx.moveTo(x, top + (bot - top) * 0.62);
-    ctx.lineTo(x + ww, top + (bot - top) * 0.62);
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }
-  // wainscot
-  ctx.fillStyle = '#26101a';
-  ctx.fillRect(-20, floorY - h * 0.17, w + 40, h * 0.17);
-  ctx.fillStyle = '#8c6a2c';
-  ctx.fillRect(-20, floorY - h * 0.17, w + 40, 2);
-  // teller counter
-  const Cp = Math.max(320, w * 0.62);
-  const cOff = (scroll * 0.85) % Cp;
-  for (let i = -1; i <= Math.ceil(w / Cp) + 1; i++) {
-    const x = i * Cp - cOff;
-    const cw = Cp * 0.68;
-    const ct = floorY - h * 0.13;
-    ctx.strokeStyle = 'rgba(200,160,80,0.55)';
-    ctx.lineWidth = 1.5;
-    for (let gx = x + 6; gx < x + cw - 4; gx += 9) {
-      ctx.beginPath();
-      ctx.moveTo(gx, ct);
-      ctx.lineTo(gx, ct - h * 0.1);
-      ctx.stroke();
-    }
-    ctx.fillStyle = '#8c6a2c';
-    ctx.fillRect(x, ct - h * 0.1 - 3, cw, 3);
-    const g = ctx.createLinearGradient(0, ct, 0, floorY);
-    g.addColorStop(0, '#5a3322');
-    g.addColorStop(1, '#2a160e');
-    ctx.fillStyle = g;
-    ctx.fillRect(x, ct, cw, floorY - ct);
-    ctx.fillStyle = '#c9a050';
-    ctx.fillRect(x - 2, ct - 2, cw + 4, 4);
-    ctx.fillStyle = 'rgba(0,0,0,0.25)';
-    for (let k = 1; k < 4; k++) ctx.fillRect(x + (cw / 4) * k, ct + 4, 2, floorY - ct - 4);
-  }
-  // marble columns
-  const P = Math.max(240, w * 0.42);
-  const pOff = (scroll * 0.65) % P;
-  const cw = Math.max(24, h * 0.075);
-  for (let i = -1; i <= Math.ceil(w / P) + 1; i++) {
-    const x = i * P - pOff + P * 0.15;
-    const g = ctx.createLinearGradient(x, 0, x + cw, 0);
-    g.addColorStop(0, '#6f6455');
-    g.addColorStop(0.5, '#e3d7bf');
-    g.addColorStop(1, '#6f6455');
-    ctx.fillStyle = g;
-    ctx.fillRect(x, h * 0.08, cw, floorY - h * 0.08);
-    ctx.fillStyle = 'rgba(80,60,40,0.25)';
-    for (let k = 1; k < 4; k++) ctx.fillRect(x + (cw / 4) * k, h * 0.1, 1.5, floorY - h * 0.14);
-    ctx.fillStyle = '#cfc2a8';
-    ctx.fillRect(x - cw * 0.2, h * 0.07, cw * 1.4, h * 0.03);
-    ctx.fillRect(x - cw * 0.2, floorY - h * 0.03, cw * 1.4, h * 0.03);
-    alarmLamp(ctx, x + cw / 2, h * 0.16, cw * 0.28, h, alarm);
-  }
-  // checkered marble floor
-  ctx.fillStyle = '#1a0f12';
-  ctx.fillRect(-20, floorY, w + 40, h - floorY + 20);
-  const T = Math.max(40, h * 0.17);
-  const start = Math.floor(scroll / T);
-  const off = scroll % T;
-  const rows = [floorY, floorY + (h - floorY) * 0.3, floorY + (h - floorY) * 0.65, h + 4];
-  for (let r = 0; r < 3; r++) {
-    const y0 = rows[r], y1 = rows[r + 1];
-    const d0 = (y0 - floorY) * 0.9, d1 = (y1 - floorY) * 0.9;
-    for (let k = -2; k <= Math.ceil(w / T) + 3; k++) {
-      if ((start + k + r) % 2 !== 0) continue;
-      const x0 = k * T - off;
-      ctx.fillStyle = '#3a2a2c';
-      ctx.beginPath();
-      ctx.moveTo(x0 - d0, y0);
-      ctx.lineTo(x0 + T - d0, y0);
-      ctx.lineTo(x0 + T - d1, y1);
-      ctx.lineTo(x0 - d1, y1);
-      ctx.closePath();
-      ctx.fill();
-    }
-  }
-  ctx.fillStyle = 'rgba(255,220,170,0.05)';
-  ctx.fillRect(0, floorY, w, (h - floorY) * 0.3);
-  ctx.fillStyle = '#8c6a2c';
-  ctx.fillRect(-20, floorY - 2, w + 40, 3);
-}
-
-function drawStreetBG(ctx, w, h, scroll, floorY, gy, time) {
-  const sg = ctx.createLinearGradient(0, 0, 0, floorY);
-  sg.addColorStop(0, '#050918');
-  sg.addColorStop(1, '#1a2250');
-  ctx.fillStyle = sg;
-  ctx.fillRect(-20, -20, w + 40, floorY + 20);
-  const mx = w * 0.84, my = h * 0.13, mr = h * 0.05;
-  const mg = ctx.createRadialGradient(mx, my, mr * 0.5, mx, my, mr * 4);
-  mg.addColorStop(0, 'rgba(240,236,210,0.35)');
-  mg.addColorStop(1, 'rgba(240,236,210,0)');
-  ctx.fillStyle = mg;
-  ctx.fillRect(mx - mr * 4, my - mr * 4, mr * 8, mr * 8);
-  ctx.fillStyle = '#efecd8';
-  ctx.beginPath(); ctx.arc(mx, my, mr, 0, TAU); ctx.fill();
-  // far skyline
-  const Bw = Math.max(40, h * 0.2);
-  const fs = scroll * 0.1;
-  const fStart = Math.floor(fs / Bw), fOff = fs % Bw;
-  for (let k = -1; k <= Math.ceil(w / Bw) + 1; k++) {
-    const n = fStart + k;
-    const bh = h * (0.22 + hash(n, 31) * 0.32);
-    const x = k * Bw - fOff;
-    ctx.fillStyle = '#0e1330';
-    ctx.fillRect(x, floorY - bh, Bw - 3, bh);
-    for (let wy = floorY - bh + 8; wy < floorY - 10; wy += 11) {
-      for (let wx = x + 5; wx < x + Bw - 10; wx += 9) {
-        if (hash(Math.floor(wx * 3 + wy * 7) + n, 33) > 0.78) {
-          ctx.fillStyle = 'rgba(255,210,122,0.55)';
-          ctx.fillRect(wx, wy, 4, 5);
-        }
-      }
-    }
-  }
-  // storefronts
-  const Fw = Math.max(200, h * 0.75);
-  const ns = scroll * 0.45;
-  const nStart = Math.floor(ns / Fw), nOff = ns % Fw;
-  for (let k = -1; k <= Math.ceil(w / Fw) + 1; k++) {
-    const n = nStart + k;
-    const x = k * Fw - nOff;
-    const top = floorY - h * (0.42 + hash(n, 41) * 0.18);
-    ctx.fillStyle = hash(n, 43) > 0.5 ? '#2a1b2a' : '#1f2238';
-    ctx.fillRect(x, top, Fw - 8, floorY - top);
-    for (let wy = top + h * 0.04; wy < floorY - h * 0.22; wy += h * 0.07) {
-      for (let wx = x + Fw * 0.08; wx < x + Fw - Fw * 0.15; wx += Fw * 0.16) {
-        const lit = hash(Math.floor(wx + wy * 5) + n * 17, 47) > 0.55;
-        ctx.fillStyle = lit ? 'rgba(255,200,120,0.6)' : '#141628';
-        ctx.fillRect(wx, wy, Fw * 0.08, h * 0.04);
-      }
-    }
-    // shop window + awning
-    ctx.fillStyle = 'rgba(255,207,122,0.32)';
-    ctx.fillRect(x + Fw * 0.08, floorY - h * 0.16, Fw * 0.6, h * 0.13);
-    const aw = Fw * 0.66, ax = x + Fw * 0.05, ay = floorY - h * 0.19;
-    for (let s = 0; s < 8; s++) {
-      ctx.fillStyle = s % 2 ? '#f2efe6' : (hash(n, 49) > 0.5 ? '#c0392b' : '#2e86ab');
-      ctx.beginPath();
-      ctx.moveTo(ax + (aw / 8) * s, ay);
-      ctx.lineTo(ax + (aw / 8) * (s + 1), ay);
-      ctx.lineTo(ax + (aw / 8) * (s + 1) + 3, ay + h * 0.03);
-      ctx.lineTo(ax + (aw / 8) * s + 3, ay + h * 0.03);
-      ctx.closePath();
-      ctx.fill();
-    }
-  }
-  // sidewalk + road
-  const curbY = gy + h * 0.05;
-  ctx.fillStyle = '#2b2d3a';
-  ctx.fillRect(-20, floorY, w + 40, curbY - floorY);
-  slantLines(ctx, w, curbY, floorY, scroll, Math.max(40, h * 0.18), '#22242f');
-  ctx.fillStyle = '#12131a';
-  ctx.fillRect(-20, curbY, w + 40, h - curbY + 20);
-  ctx.fillStyle = '#585b6c';
-  ctx.fillRect(-20, curbY, w + 40, 3);
-  const dashY = curbY + (h - curbY) * 0.6;
-  const D = Math.max(60, h * 0.22);
-  const dOff = (scroll * 1.15) % D;
-  ctx.fillStyle = 'rgba(255,214,102,0.8)';
-  for (let x = -dOff; x < w + D; x += D) ctx.fillRect(x, dashY, D * 0.5, Math.max(2, h * 0.008));
-  // street lamps
-  const Lp = Math.max(260, w * 0.5);
-  const lOff = scroll % Lp;
-  for (let x = -lOff + Lp * 0.7; x < w + Lp; x += Lp) {
-    const top = h * 0.24;
-    const lg = ctx.createLinearGradient(0, top, 0, floorY + h * 0.05);
-    lg.addColorStop(0, 'rgba(255,214,140,0.22)');
-    lg.addColorStop(1, 'rgba(255,214,140,0)');
-    ctx.fillStyle = lg;
-    ctx.beginPath();
-    ctx.moveTo(x + 8, top);
-    ctx.lineTo(x + 8 + h * 0.13, floorY + h * 0.06);
-    ctx.lineTo(x + 8 - h * 0.13, floorY + h * 0.06);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = '#2d3040';
-    ctx.fillRect(x - 2, top, 4, floorY - top);
-    ctx.fillRect(x - 2, top, 14, 3);
-    ctx.fillStyle = '#ffe2a0';
-    rr(ctx, x + 3, top + 2, 10, 5, 2);
-    ctx.fill();
-  }
-}
-
-function slantLines(ctx, w, bottom, floorY, scroll, T, color) {
-  const off = scroll % T;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  for (let x = -off - T; x < w + T * 3; x += T) {
-    ctx.beginPath();
-    ctx.moveTo(x, floorY);
-    ctx.lineTo(x - (bottom - floorY) * 0.9, bottom);
-    ctx.stroke();
-  }
-}
-
-function alarmLamp(ctx, x, y, r, h, alarm) {
-  if (alarm > 0) {
-    const g = ctx.createRadialGradient(x, y, 0, x, y, h * 0.2);
-    g.addColorStop(0, `rgba(255,77,77,${0.55 * alarm})`);
-    g.addColorStop(1, 'rgba(255,77,77,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(x - h * 0.2, y - h * 0.2, h * 0.4, h * 0.4);
-  }
-  ctx.fillStyle = alarm > 0 ? C.alarm : C.alarmOff;
-  ctx.beginPath();
-  ctx.arc(x, y, r, Math.PI, 0);
-  ctx.fill();
-}
-
-function drawGate(ctx, x, h, floorY, type) {
-  if (type === 'hall') {
-    const gw = h * 0.07;
-    const g = ctx.createLinearGradient(x - gw, 0, x + gw, 0);
-    g.addColorStop(0, '#3d5551');
-    g.addColorStop(0.5, '#a9c2bd');
-    g.addColorStop(1, '#3d5551');
-    ctx.fillStyle = g;
-    ctx.fillRect(x - gw, -10, gw * 2, floorY + 10);
-    ctx.fillStyle = '#2b3d3a';
-    for (let y = h * 0.05; y < floorY; y += h * 0.06) {
-      ctx.beginPath(); ctx.arc(x - gw * 0.6, y, 2, 0, TAU); ctx.arc(x + gw * 0.6, y, 2, 0, TAU); ctx.fill();
-    }
-    ctx.fillStyle = '#0f3d22';
-    rr(ctx, x - gw * 0.8, h * 0.18, gw * 1.6, h * 0.05, 3);
-    ctx.fill();
-    ctx.fillStyle = '#5cf29a';
-    ctx.font = `700 ${Math.round(h * 0.032)}px "Chakra Petch", system-ui, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('EXIT', x, h * 0.205);
-  } else {
-    const gw = h * 0.05;
-    ctx.fillStyle = '#6b4e1f';
-    ctx.fillRect(x - gw * 2.2, h * 0.08, gw * 4.4, h * 0.06);
-    ctx.fillStyle = '#e8b24a';
-    ctx.font = `700 ${Math.round(h * 0.04)}px Georgia, serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('BANK', x, h * 0.11);
-    ctx.fillStyle = 'rgba(180,220,255,0.10)';
-    ctx.fillRect(x - gw * 2, h * 0.14, gw * 4, floorY - h * 0.14);
-    ctx.fillStyle = '#b08a3e';
-    ctx.fillRect(x - gw * 2.2, h * 0.14, gw * 0.3, floorY - h * 0.14);
-    ctx.fillRect(x + gw * 1.9, h * 0.14, gw * 0.3, floorY - h * 0.14);
-    ctx.fillRect(x - 1.5, h * 0.14, 3, floorY - h * 0.14);
-  }
-}
-
-/* ───────── Booby traps ───────── */
-
-function drawTrap(ctx, tr, x, w, h, floorY, gy, rx, time) {
-  const yB = floorY + 2, yF = gy + (h - gy) * 0.75;
-  const xB = x + (gy - yB) * 0.9, xF = x - (yF - gy) * 0.9;
-  const kB = 0.82, kF = 1.12;
-  const near = clamp((w * 0.5 - (x - rx)) / (w * 0.18), 0, 1);
-  const post = (px, py, ph, k) => {
-    ctx.fillStyle = '#20262c';
-    rr(ctx, px - 4 * k, py - ph, 8 * k, ph, 2);
-    ctx.fill();
-    ctx.fillStyle = '#ff2d55';
-    ctx.beginPath(); ctx.arc(px, py - ph + 4 * k, 2.4 * k, 0, TAU); ctx.fill();
-  };
-  if (tr.type === 'laserLow' || tr.type === 'laserHigh') {
-    const H = tr.type === 'laserLow' ? h * 0.07 : h * 0.21;
-    post(xB, yB, H * kB + 8, kB);
-    ctx.save();
-    ctx.shadowColor = C.laser;
-    ctx.shadowBlur = 12;
-    ctx.strokeStyle = C.laser;
-    ctx.lineWidth = Math.max(2, h * 0.006);
-    ctx.globalAlpha = 0.75 + 0.25 * Math.sin(time * 30 + tr.x);
-    ctx.beginPath();
-    ctx.moveTo(xB, yB - H * kB);
-    ctx.lineTo(xF, yF - H * kF);
-    ctx.stroke();
-    ctx.restore();
-    post(xF, yF, H * kF + 8, kF);
-  } else if (tr.type === 'spikes' || tr.type === 'spikestrip') {
-    const big = tr.type === 'spikes';
-    const pop = big ? easeOut(near) : 1;
-    const n = 9;
-    ctx.fillStyle = '#2a2f36';
-    ctx.beginPath();
-    ctx.moveTo(xB - 10, yB); ctx.lineTo(xB + 10, yB); ctx.lineTo(xF + 14, yF); ctx.lineTo(xF - 14, yF);
-    ctx.closePath();
-    ctx.fill();
-    for (let i = 0; i <= n; i++) {
-      const u = i / n;
-      const px = lerp(xB, xF, u), py = lerp(yB, yF, u);
-      const k = lerp(kB, kF, u);
-      const sh = (big ? h * 0.07 : h * 0.025) * k * pop;
-      for (const dx of [-7, 0, 7]) {
-        const g = ctx.createLinearGradient(px, py - sh, px, py);
-        g.addColorStop(0, '#f0f4f8');
-        g.addColorStop(1, '#6a7480');
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.moveTo(px + dx * k - 3.5 * k, py);
-        ctx.lineTo(px + dx * k, py - sh);
-        ctx.lineTo(px + dx * k + 3.5 * k, py);
-        ctx.closePath();
-        ctx.fill();
-      }
-    }
-  } else if (tr.type === 'shutter') {
-    const bottom = lerp(-h * 0.1, gy - h * 0.19, easeOut(near));
-    const sw = h * 0.05, depth = h * 0.05;
-    ctx.fillStyle = '#3b4148';
-    ctx.beginPath();
-    ctx.moveTo(x + sw / 2, -10);
-    ctx.lineTo(x + sw / 2 + depth, -10 - depth * 0.6);
-    ctx.lineTo(x + sw / 2 + depth, bottom - depth * 0.6);
-    ctx.lineTo(x + sw / 2, bottom);
-    ctx.closePath();
-    ctx.fill();
-    const g = ctx.createLinearGradient(x - sw / 2, 0, x + sw / 2, 0);
-    g.addColorStop(0, '#6c7680');
-    g.addColorStop(0.5, '#b8c2cc');
-    g.addColorStop(1, '#5d6670');
-    ctx.fillStyle = g;
-    ctx.fillRect(x - sw / 2, -10, sw, bottom + 10);
-    ctx.fillStyle = 'rgba(0,0,0,0.25)';
-    for (let y = bottom - 8; y > 0; y -= 9) ctx.fillRect(x - sw / 2, y, sw, 2);
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(x - sw / 2, bottom - h * 0.025, sw, h * 0.025);
-    ctx.clip();
-    ctx.fillStyle = '#f2c14e';
-    ctx.fillRect(x - sw / 2, bottom - h * 0.025, sw, h * 0.025);
-    ctx.fillStyle = '#111';
-    for (let s = -sw; s < sw * 2; s += 10) {
-      ctx.beginPath();
-      ctx.moveTo(x - sw / 2 + s, bottom);
-      ctx.lineTo(x - sw / 2 + s + 5, bottom);
-      ctx.lineTo(x - sw / 2 + s + 5 + h * 0.025, bottom - h * 0.025);
-      ctx.lineTo(x - sw / 2 + s + h * 0.025, bottom - h * 0.025);
-      ctx.closePath();
-      ctx.fill();
-    }
-    ctx.restore();
-  } else if (tr.type === 'barrier') {
-    const H = h * 0.11;
-    const leg = (px, py, k) => {
-      ctx.strokeStyle = '#d7dbe2';
-      ctx.lineWidth = 3 * k;
-      ctx.beginPath();
-      ctx.moveTo(px - 9 * k, py);
-      ctx.lineTo(px, py - H * k);
-      ctx.lineTo(px + 9 * k, py);
-      ctx.stroke();
-    };
-    leg(xB, yB, kB);
-    const th = h * 0.032;
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(xB, yB - H * kB - th * kB);
-    ctx.lineTo(xF, yF - H * kF - th * kF);
-    ctx.lineTo(xF, yF - H * kF);
-    ctx.lineTo(xB, yB - H * kB);
-    ctx.closePath();
-    ctx.fillStyle = '#f4f4f4';
-    ctx.fill();
-    ctx.clip();
-    ctx.fillStyle = '#e8402f';
-    const len = Math.hypot(xF - xB, yF - yB);
-    for (let s = 0; s < len + 40; s += 16) {
-      const u = s / len;
-      const px = lerp(xB, xF, u), py = lerp(yB - H * kB, yF - H * kF, u);
-      ctx.beginPath();
-      ctx.moveTo(px, py - th * 2);
-      ctx.lineTo(px + 8, py - th * 2);
-      ctx.lineTo(px - 4, py + th);
-      ctx.lineTo(px - 12, py + th);
-      ctx.closePath();
-      ctx.fill();
-    }
-    ctx.restore();
-    leg(xF, yF, kF);
-    // little warning light
-    ctx.fillStyle = Math.sin(time * 6 + tr.x) > 0 ? '#ffb347' : '#5a3a10';
-    ctx.beginPath(); ctx.arc(xF, yF - H * kF - th * kF - 4, 3.5, 0, TAU); ctx.fill();
-  }
-}
-
-/* ───────── Police car + helicopter ───────── */
-
-function drawPoliceCar(ctx, x, y, s, time, wheelRot, reduced) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(s, s);
-  ctx.fillStyle = 'rgba(0,0,0,0.4)';
-  ctx.beginPath(); ctx.ellipse(0, 2, 72, 7, 0, 0, TAU); ctx.fill();
-  // body
-  ctx.fillStyle = '#121318';
-  rr(ctx, -70, -30, 140, 24, 8);
-  ctx.fill();
-  ctx.fillStyle = '#eef1f6';
-  ctx.fillRect(-34, -30, 64, 24);
-  // cabin
-  ctx.fillStyle = '#121318';
-  ctx.beginPath();
-  ctx.moveTo(-40, -30); ctx.lineTo(-26, -50); ctx.lineTo(22, -50); ctx.lineTo(40, -30);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = '#8fb6d8';
-  ctx.beginPath();
-  ctx.moveTo(-34, -32); ctx.lineTo(-24, -46); ctx.lineTo(-3, -46); ctx.lineTo(-3, -32);
-  ctx.closePath();
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(1, -32); ctx.lineTo(1, -46); ctx.lineTo(20, -46); ctx.lineTo(33, -32);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = '#1f3b8a';
-  ctx.font = '900 10px system-ui, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('POLICE', -2, -18);
-  ctx.fillStyle = '#ffe9a8';
-  ctx.fillRect(64, -26, 6, 6);
-  ctx.fillStyle = '#ff4d4d';
-  ctx.fillRect(-70, -26, 5, 6);
-  // light bar
-  const on = reduced ? true : Math.floor(time * 3) % 2 === 0;
-  ctx.fillStyle = '#222';
-  ctx.fillRect(-14, -55, 28, 5);
-  ctx.fillStyle = on ? '#ff3b3b' : '#5a1515';
-  ctx.fillRect(-14, -55, 13, 5);
-  ctx.fillStyle = on ? '#28307a' : '#4a6bff';
-  ctx.fillRect(1, -55, 13, 5);
-  const glow = (cx, col) => {
-    const g = ctx.createRadialGradient(cx, -53, 0, cx, -53, 60);
-    g.addColorStop(0, col);
-    g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(cx - 60, -113, 120, 120);
-  };
-  glow(on ? -7 : 7, on ? 'rgba(255,59,59,0.45)' : 'rgba(74,107,255,0.5)');
-  // wheels
-  for (const wx of [-44, 44]) {
-    ctx.fillStyle = '#0a0a0c';
-    ctx.beginPath(); ctx.arc(wx, -4, 13, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#8b93a3';
-    ctx.beginPath(); ctx.arc(wx, -4, 6, 0, TAU); ctx.fill();
-    ctx.strokeStyle = '#3a3f4a';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(wx + Math.cos(wheelRot) * 6, -4 + Math.sin(wheelRot) * 6);
-    ctx.lineTo(wx - Math.cos(wheelRot) * 6, -4 - Math.sin(wheelRot) * 6);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-function drawHeli(ctx, x, y, s, time) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(s, s);
-  ctx.fillStyle = '#0d1020';
-  ctx.beginPath(); ctx.ellipse(0, 0, 30, 14, 0, 0, TAU); ctx.fill();
-  ctx.fillRect(-62, -4, 40, 6);
-  ctx.fillRect(-66, -12, 6, 14);
-  ctx.fillStyle = '#2a3150';
-  ctx.beginPath(); ctx.ellipse(14, -2, 12, 8, 0, 0, TAU); ctx.fill();
-  ctx.strokeStyle = '#0d1020';
-  ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.moveTo(-18, 18); ctx.lineTo(22, 18); ctx.stroke();
-  ctx.fillStyle = 'rgba(150,160,190,0.4)';
-  ctx.beginPath(); ctx.ellipse(0, -18, 70 * Math.abs(Math.sin(time * 30)) + 20, 3, 0, 0, TAU); ctx.fill();
-  ctx.fillStyle = Math.sin(time * 8) > 0 ? '#ff3b3b' : '#3b0d0d';
-  ctx.beginPath(); ctx.arc(-64, -12, 3, 0, TAU); ctx.fill();
-  ctx.restore();
-}
-
-/* ───────── Vault door ───────── */
-
-function drawDoor(ctx, cx, cy, R, spin, progress, openAngle) {
+function drawDoor(ctx, cx, cy, R, spin, progress, openAngle, time) {
   if (openAngle > 0) {
-    const gl = ctx.createRadialGradient(cx, cy, R * 0.1, cx, cy, R * 1.4);
-    gl.addColorStop(0, `rgba(255,214,120,${0.55 * Math.min(1, openAngle)})`);
+    const gl = ctx.createRadialGradient(cx, cy, R * 0.1, cx, cy, R * 1.6);
+    gl.addColorStop(0, `rgba(255,214,120,${0.65 * Math.min(1, openAngle)})`);
     gl.addColorStop(1, 'rgba(255,214,120,0)');
     ctx.fillStyle = gl;
-    ctx.beginPath(); ctx.arc(cx, cy, R * 1.4, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, R * 1.6, 0, TAU); ctx.fill();
   }
-  ctx.fillStyle = '#0b201e';
-  ctx.beginPath(); ctx.arc(cx, cy, R * 1.12, 0, TAU); ctx.fill();
-  ctx.strokeStyle = C.brassDark;
-  ctx.lineWidth = R * 0.04;
+  // frame
+  ctx.fillStyle = '#061615';
+  ctx.beginPath(); ctx.arc(cx, cy, R * 1.16, 0, TAU); ctx.fill();
+  const fg = ctx.createLinearGradient(cx - R, cy - R, cx + R, cy + R);
+  fg.addColorStop(0, '#f0c25a'); fg.addColorStop(1, '#6a4512');
+  ctx.strokeStyle = fg;
+  ctx.lineWidth = R * 0.07;
   ctx.stroke();
   if (openAngle > 0) {
     const gi = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
-    gi.addColorStop(0, 'rgba(255,220,130,0.95)');
-    gi.addColorStop(1, 'rgba(160,100,20,0.35)');
+    gi.addColorStop(0, 'rgba(255,236,160,1)');
+    gi.addColorStop(0.5, 'rgba(255,200,90,0.8)');
+    gi.addColorStop(1, 'rgba(160,100,20,0.4)');
     ctx.fillStyle = gi;
-    ctx.beginPath(); ctx.arc(cx, cy, R * 1.02, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, R * 1.04, 0, TAU); ctx.fill();
+    // gold mountain inside
+    for (let i = 0; i < 7; i++) {
+      const bx = cx - R * 0.6 + (i % 4) * R * 0.32 + (i > 3 ? R * 0.16 : 0);
+      const by = cy + R * 0.7 - (i > 3 ? R * 0.16 : 0);
+      drawGoldBar(ctx, bx, by, R * 0.28, R * 0.11);
+    }
   }
+  // drill progress ring
   if (progress > 0 && openAngle === 0) {
-    ctx.strokeStyle = 'rgba(232,178,74,0.18)';
-    ctx.lineWidth = R * 0.06;
-    ctx.beginPath(); ctx.arc(cx, cy, R * 1.22, 0, TAU); ctx.stroke();
-    ctx.strokeStyle = C.brass;
+    ctx.strokeStyle = 'rgba(232,178,74,0.15)';
+    ctx.lineWidth = R * 0.07;
+    ctx.beginPath(); ctx.arc(cx, cy, R * 1.3, 0, TAU); ctx.stroke();
+    ctx.save();
     ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.arc(cx, cy, R * 1.22, -Math.PI / 2, -Math.PI / 2 + progress * TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, R * 1.3, -Math.PI / 2, -Math.PI / 2 + progress * TAU);
+    ctx.strokeStyle = 'rgba(255,207,74,0.25)';
+    ctx.lineWidth = R * 0.16;
+    ctx.stroke();
+    ctx.strokeStyle = C.brass;
+    ctx.lineWidth = R * 0.07;
+    ctx.stroke();
+    ctx.restore();
   }
   ctx.save();
-  const sq = Math.cos(Math.min(openAngle, 1.45));
+  const sq = Math.cos(Math.min(openAngle, 1.5));
   ctx.translate(cx - R, cy);
   ctx.scale(sq, 1);
   ctx.translate(R, 0);
+  // door thickness when swinging
+  if (openAngle > 0) {
+    ctx.fillStyle = '#2a3b38';
+    ctx.fillRect(-R - R * 0.25 * (1 - sq) * 4, -R * 0.9, R * 0.25 * (1 - sq) * 4, R * 1.8);
+  }
   const g = ctx.createRadialGradient(-R * 0.3, -R * 0.35, R * 0.1, 0, 0, R);
-  g.addColorStop(0, '#c9dad6');
-  g.addColorStop(0.6, '#7d9893');
-  g.addColorStop(1, '#3d5551');
+  g.addColorStop(0, '#e2efec');
+  g.addColorStop(0.55, '#8aa6a1');
+  g.addColorStop(1, '#344a47');
   ctx.fillStyle = g;
   ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
-  ctx.strokeStyle = 'rgba(20,40,38,0.55)';
-  ctx.lineWidth = R * 0.02;
-  for (const k of [0.82, 0.62]) { ctx.beginPath(); ctx.arc(0, 0, R * k, 0, TAU); ctx.stroke(); }
-  for (let i = 0; i < 14; i++) {
-    const a = (i / 14) * TAU;
+  ctx.strokeStyle = 'rgba(15,32,30,0.6)';
+  ctx.lineWidth = R * 0.022;
+  for (const k of [0.84, 0.66, 0.3]) { ctx.beginPath(); ctx.arc(0, 0, R * k, 0, TAU); ctx.stroke(); }
+  // locking bolts retract as the drill gets through
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * TAU;
+    const out = R * (0.93 + 0.12 * (1 - progress) * (openAngle > 0 ? 0 : 1));
     ctx.fillStyle = '#2f4441';
-    ctx.beginPath(); ctx.arc(Math.cos(a) * R * 0.91, Math.sin(a) * R * 0.91, R * 0.035, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(Math.cos(a) * R * 0.92, Math.sin(a) * R * 0.92, R * 0.035, 0, TAU); ctx.fill();
+    if (openAngle === 0) {
+      ctx.strokeStyle = '#c9d6d3';
+      ctx.lineWidth = R * 0.045;
+      ctx.beginPath(); ctx.moveTo(Math.cos(a) * R * 0.92, Math.sin(a) * R * 0.92); ctx.lineTo(Math.cos(a) * out, Math.sin(a) * out); ctx.stroke();
+    }
   }
+  // combination dial + spokes
   ctx.save();
   ctx.rotate(spin);
   ctx.strokeStyle = C.brass;
   ctx.lineCap = 'round';
-  ctx.lineWidth = R * 0.07;
+  ctx.lineWidth = R * 0.075;
   for (let i = 0; i < 3; i++) {
     const a = (i / 3) * Math.PI;
-    ctx.beginPath();
-    ctx.moveTo(Math.cos(a) * -R * 0.44, Math.sin(a) * -R * 0.44);
-    ctx.lineTo(Math.cos(a) * R * 0.44, Math.sin(a) * R * 0.44);
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(Math.cos(a) * -R * 0.46, Math.sin(a) * -R * 0.46); ctx.lineTo(Math.cos(a) * R * 0.46, Math.sin(a) * R * 0.46); ctx.stroke();
   }
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * TAU;
-    ctx.fillStyle = C.brass;
-    ctx.beginPath(); ctx.arc(Math.cos(a) * R * 0.46, Math.sin(a) * R * 0.46, R * 0.07, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ffd77a';
+    ctx.beginPath(); ctx.arc(Math.cos(a) * R * 0.48, Math.sin(a) * R * 0.48, R * 0.075, 0, TAU); ctx.fill();
   }
   ctx.fillStyle = C.brassDark;
-  ctx.beginPath(); ctx.arc(0, 0, R * 0.14, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.arc(0, 0, R * 0.16, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#ffd77a';
+  for (let i = 0; i < 24; i++) {
+    const a = (i / 24) * TAU;
+    ctx.fillRect(Math.cos(a) * R * 0.12 - 0.8, Math.sin(a) * R * 0.12 - 0.8, 1.6, 1.6);
+  }
   ctx.restore();
   ctx.restore();
 }
@@ -682,20 +138,104 @@ function drawGoldBar(ctx, x, y, bw, bh) {
   g.addColorStop(1, C.goldDark);
   ctx.fillStyle = g;
   ctx.fill();
-  ctx.strokeStyle = 'rgba(80,50,0,0.6)';
+  ctx.strokeStyle = 'rgba(80,50,0,0.7)';
   ctx.lineWidth = 1;
   ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fillRect(x + bw * 0.2, y - bh + 1.5, bw * 0.35, Math.max(1, bh * 0.12));
+}
+
+function drawCash(ctx, x, y, bw, bh) {
+  ctx.fillStyle = 'rgba(6,8,12,0.85)';
+  ctx.fillRect(x - 1, y - bh - 1, bw + 2, bh + 2);
+  ctx.fillStyle = '#7fc98a';
+  ctx.fillRect(x, y - bh, bw, bh);
+  ctx.fillStyle = '#5aa868';
+  for (let k = 1; k < 4; k++) ctx.fillRect(x, y - bh + (bh / 4) * k, bw, 0.8);
+  ctx.fillStyle = '#f2efe6';
+  ctx.fillRect(x + bw * 0.4, y - bh, bw * 0.2, bh);
+}
+
+function drawCamera(ctx, x, y, s, angle, time, alarmed) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const len = s * 260;
+  ctx.rotate(angle);
+  const g = ctx.createLinearGradient(0, 0, len, 0);
+  g.addColorStop(0, alarmed ? 'rgba(255,40,40,0.35)' : 'rgba(255,60,60,0.18)');
+  g.addColorStop(1, 'rgba(255,60,60,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(len, -len * 0.25); ctx.lineTo(len, len * 0.25); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = '#1a1d22';
+  ctx.fillRect(-s * 4, -s * 18, s * 8, s * 18);
+  ctx.rotate(angle);
+  ctx.fillStyle = 'rgba(6,8,12,0.9)';
+  rr(ctx, -s * 6, -s * 9, s * 34, s * 18, s * 3);
+  ctx.fill();
+  ctx.fillStyle = '#d8dde4';
+  rr(ctx, -s * 5, -s * 8, s * 32, s * 16, s * 3);
+  ctx.fill();
+  ctx.fillStyle = '#111';
+  ctx.beginPath(); ctx.arc(s * 26, 0, s * 6, 0, TAU); ctx.fill();
+  ctx.fillStyle = Math.sin(time * 6) > 0 ? '#ff3b3b' : '#4a1010';
+  ctx.beginPath(); ctx.arc(s * 2, -s * 4, s * 2, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+function drawCuffs(ctx, x, y, r) {
+  if (r <= 0) return;
+  ctx.save();
+  ctx.strokeStyle = '#e2e8f0';
+  ctx.lineWidth = Math.max(2, r * 0.24);
+  ctx.beginPath(); ctx.arc(x - r * 0.75, y, r * 0.55, 0, TAU); ctx.stroke();
+  ctx.beginPath(); ctx.arc(x + r * 0.75, y, r * 0.55, 0, TAU); ctx.stroke();
+  ctx.lineWidth = Math.max(1.5, r * 0.12);
+  ctx.beginPath(); ctx.moveTo(x - r * 0.2, y); ctx.lineTo(x + r * 0.2, y); ctx.stroke();
+  ctx.restore();
+}
+
+function drawNet(ctx, cx, bottom, wNet, hNet) {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(230,220,190,0.9)';
+  ctx.lineWidth = 2;
+  const top = bottom - hNet;
+  const cols = 9, rows = 6;
+  for (let i = 0; i <= cols; i++) {
+    const u = i / cols;
+    const xb = cx - wNet / 2 + u * wNet;
+    ctx.beginPath();
+    ctx.moveTo(cx + (u - 0.5) * wNet * 0.25, top);
+    ctx.quadraticCurveTo(cx + (u - 0.5) * wNet * 0.9, top + hNet * 0.4, xb, bottom);
+    ctx.stroke();
+  }
+  for (let j = 1; j <= rows; j++) {
+    const v = j / rows;
+    const wv = lerp(wNet * 0.25, wNet, Math.sqrt(v));
+    ctx.beginPath();
+    ctx.moveTo(cx - wv / 2, top + hNet * v);
+    ctx.quadraticCurveTo(cx, top + hNet * v + hNet * 0.05, cx + wv / 2, top + hNet * v);
+    ctx.stroke();
+  }
+  ctx.fillStyle = '#2a2d36';
+  for (const sx of [-1, 1]) { ctx.beginPath(); ctx.arc(cx + sx * wNet / 2, bottom, 5, 0, TAU); ctx.fill(); }
+  ctx.restore();
 }
 
 /* ───────── Scene ───────── */
 
 export function createVaultScene() {
   let scroll = 0, speed = 0, ph = 0, time = 0, wheel = 0;
-  let lastPhase = null, lastRound = -1, scrollAtStart = 0, crashTime = 0, crashZone = 'vault';
+  let lastPhase = null, lastRound = -1, scrollAtStart = 0, crashTime = -10, crashZone = 'vault', launchTime = -10;
   let zones = [{ start: -1e12, type: 'vault' }];
   let traps = [], nextTrapX = 0, action = null;
   let collected = new Set();
-  let cops = [], car = null, heliOn = 0, bagR = 10, coinAcc = 0;
+  let chasers = [], car = null, moto = null, heliOn = 0, bagR = 10, coinAcc = 0, billAcc = 0;
+  let shake = 0, flash = 0, banner = null, lastHere = 'vault', rain = 0, slamDone = false;
+  let bagAt = null; // where the loot bag was drawn last frame: pickups fly into it
+  let heliT0 = 0, heliLock = 0, heliSpot = null, spotted = false, car2 = null, cuffed = false;
   const fx = particles();
 
   const zoneAt = (wx) => {
@@ -703,17 +243,21 @@ export function createVaultScene() {
     for (const zn of zones) if (wx >= zn.start) z = zn.type;
     return z;
   };
+  const addChaser = (kind, gap) => chasers.push({ kind, gap, ph: Math.random() * 6 });
+  const hasKind = (kind) => chasers.some((c) => c.kind === kind);
 
   return {
     draw(ctx, w, h, v, dt, reduced) {
       time += dt;
-      const floorY = h * 0.76;
-      const gy = floorY + (h - floorY) * 0.5;
-      const sc = h * 0.003;
+      const floorY = h * 0.74;
+      const gy = floorY + (h - floorY) * 0.45;
+      const sc = h * 0.0026;
       const rx = w * 0.42;
-      const doorR = h * 0.2;
-      const doorBase = rx + h * 0.36;
+      const doorR = h * 0.21;
+      const doorBase = rx + h * 0.4;
+      const doorY = floorY - doorR * 1.22;
 
+      /* phase changes */
       if (v.phase !== lastPhase || v.roundId !== lastRound) {
         if (v.phase === 'running') {
           scrollAtStart = scroll;
@@ -721,56 +265,72 @@ export function createVaultScene() {
           traps = [];
           nextTrapX = scroll + w * 1.25;
           collected = new Set();
-          cops = [{ kind: 'guard', gap: rx + 80, ph: 1 }];
-          car = null;
-          heliOn = 0;
-          action = null;
+          chasers = [];
+          addChaser('guard', rx + 120);
+          car = null; moto = null; car2 = null; heliOn = 0; action = null; lastHere = 'vault';
+          launchTime = time;
+          if (!reduced) { shake = 0.7; flash = 0.85; }
+          // the door blows open
+          for (let i = 0; i < (reduced ? 6 : 26); i++) {
+            const a = Math.random() * TAU;
+            fx.add({ kind: 'smoke', x: doorBase + Math.cos(a) * doorR * 0.8, y: doorY + Math.sin(a) * doorR * 0.8, vx: Math.cos(a) * h * 0.25 - w * 0.1, vy: Math.sin(a) * h * 0.18 - h * 0.05, drag: 2.2, life: 1.2 + Math.random() * 0.8, r: h * (0.04 + Math.random() * 0.05), scroll: 1 });
+          }
+          for (let i = 0; i < (reduced ? 4 : 18); i++) {
+            fx.add({ kind: 'debris', x: doorBase, y: doorY, vx: (Math.random() - 0.3) * w * 0.8, vy: -h * (0.4 + Math.random() * 0.9), g: h * 3, life: 1.6, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 20, r: h * (0.008 + Math.random() * 0.014), bounce: 0.3, floor: gy + (Math.random() - 0.5) * h * 0.05, scroll: 1 });
+          }
         }
         if (v.phase === 'crashed' && lastPhase === 'running') {
           crashTime = time;
           crashZone = zoneAt(scroll + rx);
           action = null;
-          for (let i = 0; i < 24; i++) {
-            fx.add({ kind: 'coin', x: rx - 20 * sc, y: gy - 60 * sc, vx: (Math.random() - 0.6) * w * 0.3, vy: -h * (0.3 + Math.random() * 0.5), g: h * 2.6, life: 2.8, bounce: 0.45, rot: Math.random() * 6, vr: 8 + Math.random() * 10, r: h * 0.012, floor: gy + (Math.random() - 0.5) * h * 0.03 });
+          slamDone = false;
+          cuffed = false;
+          car2 = null;
+          if (!reduced) shake = 1;
+          for (let i = 0; i < (reduced ? 8 : 30); i++) {
+            fx.add({ kind: 'coin', x: rx - 20 * sc, y: gy - 60 * sc, vx: (Math.random() - 0.6) * w * 0.35, vy: -h * (0.3 + Math.random() * 0.6), g: h * 2.6, life: 2.8, bounce: 0.45, rot: Math.random() * 6, vr: 8 + Math.random() * 10, r: h * 0.012, floor: gy + (Math.random() - 0.5) * h * 0.03 });
+          }
+          for (let i = 0; i < (reduced ? 4 : 14); i++) {
+            fx.add({ kind: 'bill', x: rx - 20 * sc, y: gy - 70 * sc, vx: (Math.random() - 0.5) * w * 0.25, vy: -h * (0.3 + Math.random() * 0.4), g: h * 0.35, drag: 1.2, life: 3, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 8, r: h * 0.018 });
           }
         }
         if (v.phase === 'betting') {
           fx.clear();
           zones = [{ start: -1e12, type: 'vault' }];
-          traps = [];
-          cops = [];
-          car = null;
-          heliOn = 0;
-          bagR = 10;
+          traps = []; chasers = []; car = null; moto = null; car2 = null; heliOn = 0; bagR = 10; banner = null; lastHere = 'vault';
         }
         lastPhase = v.phase;
         lastRound = v.roundId;
       }
 
       const running = v.phase === 'running';
-      const target = running ? w * (0.34 + 0.4 * clamp(Math.log(v.mult) / Math.log(10), 0, 1.8)) : 0;
-      speed = lerp(speed, target, Math.min(1, dt * (v.phase === 'crashed' ? 9 : 3)));
+      const crashed = v.phase === 'crashed';
+      const target = running ? w * (0.36 + 0.42 * clamp(Math.log(v.mult) / Math.log(10), 0, 1.8)) : 0;
+      speed = lerp(speed, target, Math.min(1, dt * (crashed ? 9 : 3)));
       const dx = speed * dt;
       scroll += dx;
       ph += dt * (4 + speed / (h * 0.09));
-      wheel += dx / (h * 0.04);
+      wheel += dx / (h * 0.045);
 
-      // new zones open up as the multiplier climbs
+      /* new zones open up as the multiplier climbs */
       if (running) {
         const last = zones[zones.length - 1].type;
         for (const z of ZONE_AT) {
-          if (v.mult >= z.min && zones.every((zn) => zn.type !== z.type) && ((z.type === 'hall' && last === 'vault') || (z.type === 'street' && last === 'hall'))) {
-            zones.push({ start: scroll + w + h * 0.1, type: z.type });
-          }
+          if (v.mult >= z.min && last === z.after) zones.push({ start: scroll + w + h * 0.15, type: z.type });
         }
       }
       const here = zoneAt(scroll + rx);
+      if (running && here !== lastHere) {
+        banner = { name: ZONE_NAMES[here], t0: time };
+        lastHere = here;
+        sfx.zone?.();
+      }
 
-      // spawn booby traps ahead
+      /* booby traps ahead */
       if (running) {
         while (nextTrapX < scroll + w * 1.3) {
           const zt = zoneAt(nextTrapX);
-          const nearGate = zones.some((zn) => Math.abs(zn.start - nextTrapX) < h * 0.4);
+          const nearGate = zones.some((zn) => Math.abs(zn.start - nextTrapX) < h * 0.45);
           if (!nearGate) {
             const opts = TRAPS[zt];
             const [type, act] = opts[Math.floor(Math.random() * opts.length)];
@@ -781,7 +341,7 @@ export function createVaultScene() {
       }
       traps = traps.filter((t) => t.x - scroll > -w * 0.5);
 
-      // robber reacts to the next trap
+      /* the robber reacts to the next trap */
       if (running && !action) {
         const rw = scroll + rx;
         const next = traps.find((t) => !t.started && t.x > rw - 5);
@@ -790,45 +350,62 @@ export function createVaultScene() {
           if (next.x - rw < speed * dur * 0.5 + 4) {
             next.started = true;
             action = { type: next.action, t0: time, dur };
+            if (next.action === 'jump') sfx.jump?.(); else sfx.slide?.();
           }
         }
       }
-      let pose = running ? 'run' : v.phase === 'crashed' ? 'hands' : 'idle';
+      let pose = running ? 'run' : crashed ? 'hands' : 'idle';
       let jumpY = 0;
       if (action) {
         const p = (time - action.t0) / action.dur;
-        if (p >= 1 || !running) action = null;
-        else if (action.type === 'jump') { pose = 'jump'; jumpY = -Math.sin(Math.PI * p) * h * 0.13; }
-        else pose = 'slide';
+        if (p >= 1 || !running) {
+          if (action.type === 'jump' && running) {
+            for (let k = 0; k < 6; k++) fx.add({ kind: 'dust', x: rx + (Math.random() - 0.5) * 30 * sc, y: gy, vx: -speed * 0.3 + (Math.random() - 0.5) * h * 0.2, vy: -h * Math.random() * 0.1, drag: 3, life: 0.5, r: h * 0.02, scroll: 1 });
+          }
+          action = null;
+        } else if (action.type === 'jump') { pose = 'jump'; jumpY = -Math.sin(Math.PI * p) * h * 0.16; }
+        else {
+          pose = 'slide';
+          if (Math.random() < 0.6) fx.add({ kind: 'spark', x: rx + 20 * sc, y: gy - 2, vx: -h * (0.3 + Math.random() * 0.4), vy: -h * Math.random() * 0.3, g: h * 2, life: 0.3 });
+        }
       }
 
+      /* draw */
       ctx.save();
-      if (v.phase === 'crashed' && !reduced) {
-        const k = 1 - clamp((time - crashTime) / 0.4, 0, 1);
-        ctx.translate((Math.random() - 0.5) * h * 0.03 * k, (Math.random() - 0.5) * h * 0.03 * k);
-      }
+      shake = Math.max(0, shake - dt * 2.2);
+      if (shake > 0) ctx.translate((Math.random() - 0.5) * h * 0.035 * shake, (Math.random() - 0.5) * h * 0.035 * shake);
 
-      // zones, clipped where each one starts
-      const alarm = running || v.phase === 'crashed' ? (reduced ? 1 : 0.55 + 0.45 * Math.sin(time * TAU * 1.1)) : 0;
+      const alarm = running || crashed ? (reduced ? 1 : 0.55 + 0.45 * Math.sin(time * TAU * 1.1)) : 0;
       for (let i = 0; i < zones.length; i++) {
-        const xa = Math.max(-20, zones[i].start - scroll);
-        const xb = i + 1 < zones.length ? Math.min(w + 20, zones[i + 1].start - scroll) : w + 20;
+        const xa = Math.max(-30, zones[i].start - scroll);
+        const xb = i + 1 < zones.length ? Math.min(w + 30, zones[i + 1].start - scroll) : w + 30;
         if (xb <= xa) continue;
         ctx.save();
         ctx.beginPath();
-        ctx.rect(xa, -20, xb - xa, h + 40);
+        ctx.rect(xa, -30, xb - xa, h + 60);
         ctx.clip();
-        if (zones[i].type === 'vault') drawVaultBG(ctx, w, h, scroll, floorY, alarm);
-        else if (zones[i].type === 'hall') drawHallBG(ctx, w, h, scroll, floorY, alarm);
-        else drawStreetBG(ctx, w, h, scroll, floorY, gy, time);
+        drawZone(ctx, zones[i].type, w, h, scroll, floorY, gy, time, alarm);
         ctx.restore();
       }
       for (let i = 1; i < zones.length; i++) {
         const gx = zones[i].start - scroll;
-        if (gx > -h * 0.3 && gx < w + h * 0.3) drawGate(ctx, gx, h, floorY, zones[i].type);
+        if (gx > -h * 0.4 && gx < w + h * 0.4) drawGate(ctx, gx, h, floorY, zones[i].type, time);
       }
 
-      // gold stacks in the vault: grabbed as he runs past
+      // floating dust in the vault and hall
+      if (here === 'vault' || here === 'hall') {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 36; i++) {
+          const px = ((hash(i, 81) * w * 1.4 - scroll * 0.35 + Math.sin(time * 0.4 + i) * 20) % (w * 1.4) + w * 1.4) % (w * 1.4) - w * 0.2;
+          const py = hash(i, 82) * floorY + Math.sin(time * 0.7 + i * 2) * 10;
+          ctx.fillStyle = `rgba(255,230,170,${0.12 + 0.18 * hash(i, 83)})`;
+          ctx.fillRect(px, py, 2, 2);
+        }
+        ctx.restore();
+      }
+
+      // loot lying around: gold bars in the vault, cash bricks in the hall
       const S = Math.max(220, w * 0.42);
       const startSeg = Math.floor(scroll / S);
       const gbw = Math.max(22, h * 0.075), gbh = gbw * 0.38;
@@ -836,133 +413,269 @@ export function createVaultScene() {
         const seg = startSeg + i;
         if (hash(seg, 7) < 0.3 || collected.has(seg)) continue;
         const wx = seg * S + hash(seg, 9) * S * 0.5;
-        if (zoneAt(wx) !== 'vault') continue;
+        const zt = zoneAt(wx);
+        if (zt !== 'vault' && zt !== 'hall') continue;
         const x = wx - scroll;
         if (running && x < rx + 6 && x > rx - h * 0.4) {
           collected.add(seg);
-          for (let k = 0; k < 14; k++) {
-            fx.add({ kind: 'spark', x: x + Math.random() * gbw * 2, y: floorY - Math.random() * gbh * 3, tx: rx - 22 * sc, ty: gy - 75 * sc, vx: 0, vy: 0, life: 0.45 + Math.random() * 0.2 });
+          sfx.coin?.();
+          for (let k = 0; k < 16; k++) {
+            fx.add({ kind: 'homing', vx: 0, vy: 0, x: x + Math.random() * gbw * 2, y: floorY - Math.random() * gbh * 3, tx: rx - 26 * sc, ty: gy - 70 * sc, life: 0.45 + Math.random() * 0.25, gold: zt === 'vault' });
           }
           continue;
         }
         const tiers = 1 + Math.floor(hash(seg, 11) * 3);
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const gl = ctx.createRadialGradient(x + gbw, floorY, 0, x + gbw, floorY, gbw * 2.4);
+        gl.addColorStop(0, zt === 'vault' ? 'rgba(255,200,80,0.28)' : 'rgba(120,255,160,0.18)');
+        gl.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = gl;
+        ctx.fillRect(x - gbw * 1.4, floorY - gbw * 2.4, gbw * 4.8, gbw * 4.8);
+        ctx.restore();
         for (let tIdx = 0; tIdx < tiers; tIdx++) {
-          for (let k = 0; k < tiers - tIdx + 1; k++) drawGoldBar(ctx, x + tIdx * gbw * 0.5 + k * gbw * 1.02, floorY + h * 0.02 - tIdx * gbh, gbw, gbh);
+          for (let k = 0; k < tiers - tIdx + 1; k++) {
+            const bx = x + tIdx * gbw * 0.5 + k * gbw * 1.02, by = floorY + h * 0.02 - tIdx * gbh;
+            if (zt === 'vault') drawGoldBar(ctx, bx, by, gbw, gbh);
+            else drawCash(ctx, bx, by, gbw * 0.9, gbh * 0.9);
+          }
         }
       }
 
-      // vault door: drilled during the countdown, swings open at launch
+      // betting: the security camera pans and the robber drills the door
       if (v.phase === 'betting') {
-        drawDoor(ctx, doorBase, floorY - doorR * 1.3, doorR, v.betProgress * TAU * 1.25, v.betProgress, 0);
-      } else if (running && scroll - scrollAtStart < w * 1.5) {
-        drawDoor(ctx, doorBase - (scroll - scrollAtStart), floorY - doorR * 1.3, doorR, 1.25 * TAU, 1, easeOut(v.tPhase / 0.6) * 1.4);
+        drawCamera(ctx, w * 0.1, h * 0.12, h * 0.0024, 0.6 + Math.sin(time * 0.8) * 0.35, time, false);
+        drawDoor(ctx, doorBase, doorY, doorR, v.betProgress * TAU * 1.5, v.betProgress, 0, time);
+      } else if (running && scroll - scrollAtStart < w * 1.6) {
+        drawDoor(ctx, doorBase - (scroll - scrollAtStart), doorY, doorR, 1.5 * TAU, 1, easeOut((time - launchTime) / 0.5) * 1.5, time);
       }
 
+      const info = { w, h, floorY, gy, rx, time };
       for (const tr of traps) {
         const x = tr.x - scroll;
-        if (x > -w * 0.3 && x < w + w * 0.3) drawTrap(ctx, tr, x, w, h, floorY, gy, rx, time);
+        if (x > -w * 0.3 && x < w * 1.3) drawTrap(ctx, tr, x, info);
       }
 
-      // helicopter spotlight on the street
-      if (running && here === 'street' && v.mult > 5) heliOn = Math.min(1, heliOn + dt * 0.8);
+      /* helicopter: its searchlight sweeps for the robber, then locks on */
+      const wantHeli = (running && ((here === 'street' && v.mult > 4) || here === 'roof')) || (crashed && heliOn > 0);
+      if (wantHeli && heliOn === 0) { heliT0 = time; spotted = false; }
+      heliOn = clamp(heliOn + dt * (wantHeli ? 0.7 : -0.5), 0, 1);
+      let heliX = 0, heliY = 0, beam = null;
       if (heliOn > 0) {
-        const hx = rx - w * 0.1 + Math.sin(time * 0.6) * w * 0.05, hy = h * 0.07 - (1 - heliOn) * h * 0.2;
-        const sg = ctx.createLinearGradient(hx, hy, rx, gy);
-        sg.addColorStop(0, 'rgba(255,250,220,0.3)');
-        sg.addColorStop(1, 'rgba(255,250,220,0.08)');
-        ctx.fillStyle = sg;
-        ctx.beginPath();
-        ctx.moveTo(hx, hy);
-        ctx.lineTo(rx + h * 0.13, gy + h * 0.02);
-        ctx.lineTo(rx - h * 0.13, gy + h * 0.02);
-        ctx.closePath();
-        ctx.fill();
-        ctx.fillStyle = 'rgba(255,250,220,0.16)';
-        ctx.beginPath(); ctx.ellipse(rx, gy + h * 0.01, h * 0.14, h * 0.03, 0, 0, TAU); ctx.fill();
-        drawHeli(ctx, hx, hy, h * 0.0022, time);
-      }
+        heliX = rx - w * 0.04 + Math.sin(time * 0.5) * w * 0.08;
+        heliY = h * 0.11 - (1 - easeOut(heliOn)) * h * 0.3 + Math.sin(time * 1.7) * h * 0.008;
+        const lockT = crashed ? 1 : clamp((time - heliT0 - 2.4) / 2.6, 0, 1);
+        heliLock = lerp(heliLock, lockT, Math.min(1, dt * 3));
+        const wander = (Math.sin(time * 1.25) * 0.6 + Math.sin(time * 2.7 + 1) * 0.4) * w * 0.34;
+        const tx = rx + wander * (1 - heliLock);
+        heliSpot = heliSpot === null ? tx : lerp(heliSpot, tx, Math.min(1, dt * 4));
+        const spotY = gy + h * 0.01 + Math.sin(time * 1.9) * h * 0.02 * (1 - heliLock);
+        const R = h * (0.13 - 0.025 * heliLock);
+        const a = heliOn * (0.55 + 0.45 * heliLock);
+        const lx = heliX + h * 0.068, ly = heliY + h * 0.045;
+        beam = { x: heliSpot, y: spotY, R, a, on: Math.abs(heliSpot - rx) < R * 0.8 };
+        if (running && !spotted && heliLock > 0.92) {
+          spotted = true;
+          banner = { name: 'SPOTTED!', t0: time, red: true };
+        }
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const bg = ctx.createLinearGradient(lx, ly, heliSpot, spotY);
+        bg.addColorStop(0, `rgba(255,250,225,${0.42 * a})`);
+        bg.addColorStop(1, `rgba(255,250,225,${0.07 * a})`);
+        ctx.fillStyle = bg;
+        ctx.beginPath(); ctx.moveTo(lx - 3, ly); ctx.lineTo(heliSpot + R, spotY); ctx.lineTo(heliSpot - R, spotY); ctx.lineTo(lx + 3, ly); ctx.closePath(); ctx.fill();
+        // dust and rain catching the light
+        for (let i = 0; i < 16; i++) {
+          const u = (hash(i, 120) + time * 0.15) % 1;
+          const px = lerp(lx, heliSpot + (hash(i, 121) - 0.5) * R * 1.8, u);
+          const py = lerp(ly, spotY, u);
+          ctx.fillStyle = `rgba(255,255,240,${0.35 * a * (1 - u * 0.5)})`;
+          ctx.fillRect(px, py, 2, 2);
+        }
+        const pool = ctx.createRadialGradient(heliSpot, spotY, 0, heliSpot, spotY, R * 1.15);
+        pool.addColorStop(0, `rgba(255,252,232,${0.5 * a})`);
+        pool.addColorStop(0.7, `rgba(255,252,232,${0.2 * a})`);
+        pool.addColorStop(1, 'rgba(255,252,232,0)');
+        ctx.fillStyle = pool;
+        ctx.beginPath(); ctx.ellipse(heliSpot, spotY, R * 1.15, R * 0.3, 0, 0, TAU); ctx.fill();
+        ctx.restore();
+        drawHeli(ctx, heliX, heliY, h * 0.0026, time, reduced);
+      } else { heliSpot = null; heliLock = 0; }
 
-      // chasers join as the escape goes on
+      /* chasers join as the escape goes on */
       if (running) {
-        if (here !== 'vault' && cops.length < 2) cops.push({ kind: 'police', gap: rx + 80, ph: 2.2 });
-        if (here === 'street' && cops.length < 3) cops.push({ kind: 'police', gap: rx + 120, ph: 0.6 });
-        if (here === 'street' && !car) car = { gap: rx + w * 0.4 };
+        if (!hasKind('dog') && v.mult >= 1.25) addChaser('dog', rx + 160);
+        if (here !== 'vault' && !hasKind('police')) addChaser('police', rx + 140);
+        if ((here === 'street' || here === 'roof') && !hasKind('police2')) addChaser('police2', rx + 160);
+        if ((here === 'street' || here === 'roof') && !hasKind('swat')) addChaser('swat', rx + 180);
+        if (here === 'street' && !car) car = { gap: rx + w * 0.7 };
+        if (here === 'street' && !moto && v.mult >= 4) moto = { gap: rx + w * 0.5 };
       }
       const sinceStart = running ? scroll - scrollAtStart : 1e9;
-      cops.forEach((c, i) => {
+      const onFoot = chasers.filter((c) => c.kind !== 'dog');
+      const tcr = crashed ? time - crashTime : 0;
+      chasers.forEach((c) => {
+        const i = onFoot.indexOf(c);
         let tgt;
-        if (v.phase === 'crashed') tgt = (i === 0 ? 34 : 34 + i * 26) * sc;
-        else tgt = w * (0.13 + 0.2 / Math.sqrt(v.mult)) + i * w * 0.075;
-        if (running && i === 0 && sinceStart < w * 0.4) tgt = rx + 80; // guard enters a moment after the alarm
-        c.gap = lerp(c.gap, tgt, Math.min(1, dt * (v.phase === 'crashed' ? 3.5 : 1.1)));
-        c.ph += dt * (4 + Math.max(speed, v.phase === 'crashed' ? h * 0.4 : 0) / (h * 0.09));
+        if (crashed) tgt = c.kind === 'dog' ? 64 * sc : (i === 0 ? 24 : 44 + i * 36) * sc;
+        else if (c.kind === 'dog') tgt = w * (0.1 + 0.12 / Math.sqrt(v.mult));
+        else tgt = w * (0.17 + 0.17 / Math.sqrt(v.mult)) + i * w * 0.085;
+        if (running && c.kind === 'guard' && sinceStart < w * 0.4) tgt = rx + 120; // a moment after the alarm
+        c.gap = lerp(c.gap, tgt, Math.min(1, dt * (crashed ? 3.5 : 1.1)));
+        c.ph += dt * (4 + Math.max(speed, crashed ? h * 0.4 : 0) / (h * 0.09)) * (c.kind === 'dog' ? 1.4 : 1);
       });
-
-      // police car behind on the road
       if (car) {
-        const tgt = v.phase === 'crashed' ? w * 0.2 : w * (0.33 + 0.1 / Math.sqrt(v.mult));
+        const tgt = here === 'roof' && !crashed ? rx + w * 1.2 : crashed ? w * 0.36 : w * (0.5 + 0.06 / Math.sqrt(v.mult));
         car.gap = lerp(car.gap, tgt, Math.min(1, dt * 1.2));
       }
+      if (moto) {
+        const tgt = here === 'roof' && !crashed ? rx + w : crashed ? w * 0.22 : w * (0.3 + 0.06 / Math.sqrt(v.mult));
+        moto.gap = lerp(moto.gap, tgt, Math.min(1, dt * 1.4));
+      }
 
-      // draw chasers (far ones first)
-      for (let i = cops.length - 1; i >= 0; i--) {
-        const c = cops[i];
-        const cx = rx - c.gap;
-        if (cx < -h * 0.3) continue;
-        const cy = gy - i * h * 0.012;
-        const csc = sc * (1 - i * 0.04);
-        const grab = v.phase === 'crashed' && c.gap < 60 * sc;
-        if (!grab && v.phase !== 'betting') {
-          // flashlight beam
-          ctx.fillStyle = 'rgba(255,240,170,0.10)';
-          ctx.beginPath();
-          ctx.moveTo(cx + 30 * csc, cy - 62 * csc);
-          ctx.lineTo(cx + h * 0.42, cy - 110 * csc);
-          ctx.lineTo(cx + h * 0.42, cy + 2);
-          ctx.closePath();
-          ctx.fill();
+      // a second squad car skids in from the right to box him in (street arrest)
+      if (crashed && crashZone === 'street') {
+        if (!car2) car2 = { x: w + h * 0.9, v: w * 2.2 };
+        const stopX = rx + h * 0.62;
+        const brake = car2.x - stopX;
+        car2.v = Math.max(0, Math.min(car2.v, brake * 5));
+        car2.x -= car2.v * dt;
+        if (car2.v > w * 0.2 && !reduced) {
+          for (let k = 0; k < 2; k++) fx.add({ kind: 'smoke', x: car2.x + h * 0.25 + (Math.random() - 0.5) * h * 0.4, y: gy + h * 0.11, vx: w * 0.1, vy: -h * 0.12, drag: 2, life: 0.9, r: h * 0.03 });
         }
-        drawPerson(ctx, cx, cy, csc, {
-          pose: grab ? 'grab' : 'run', ph: c.ph, t: time,
-          outfit: c.kind === 'guard' ? OUTFITS.guard : { ...OUTFITS.police, skin: i === 2 ? '#e2b08a' : OUTFITS.police.skin },
-          item: grab ? null : 'flashlight',
-        });
       }
 
-      // the robber
-      if (running) bagR = lerp(bagR, 13 + Math.min(12, Math.log(v.mult) * 6), Math.min(1, dt * 3));
-      if (v.phase === 'crashed') {
-        // dropped loot bag
-        drawBagOnFloor(ctx, rx - 36 * sc, gy, bagR * sc);
+      // draw chasers, far ones first
+      const order = [...chasers].sort((a, b) => b.gap - a.gap);
+      order.forEach((c) => {
+        const cx = rx - c.gap;
+        if (cx < -h * 0.35) return;
+        const i = onFoot.indexOf(c);
+        const cy = gy - (c.kind === 'dog' ? -h * 0.025 : i * h * 0.02);
+        const csc = sc * (1 - Math.max(0, i) * 0.05);
+        if (c.kind === 'dog') {
+          drawDog(ctx, cx, cy, csc * 0.95, { ph: c.ph, t: time, pose: crashed && c.gap < 90 * sc ? 'bark' : 'run' });
+          return;
+        }
+        const grab = crashed && c.gap < 70 * sc;
+        const item = grab ? null : CHASER_ITEM[c.kind];
+        if (item === 'flashlight' && v.phase !== 'betting') {
+          ctx.save();
+          ctx.globalCompositeOperation = 'lighter';
+          const fg = ctx.createLinearGradient(cx, 0, cx + h * 0.5, 0);
+          fg.addColorStop(0, 'rgba(255,240,170,0.18)');
+          fg.addColorStop(1, 'rgba(255,240,170,0)');
+          ctx.fillStyle = fg;
+          ctx.beginPath(); ctx.moveTo(cx + 34 * csc, cy - 64 * csc); ctx.lineTo(cx + h * 0.5, cy - 120 * csc); ctx.lineTo(cx + h * 0.5, cy + 4); ctx.closePath(); ctx.fill();
+          ctx.restore();
+        }
+        drawPerson(ctx, cx, cy, csc, { pose: grab ? 'grab' : 'run', ph: c.ph, t: time, outfit: CHASER_OUTFIT[c.kind], item });
+      });
+
+      // rooftop arrest: SWAT abseils down from the helicopter
+      if (crashed && crashZone === 'roof' && heliOn > 0) {
+        const p = reduced ? 1 : easeOut(clamp((tcr - 0.35) / 0.8, 0, 1));
+        const swx = rx + h * 0.24, top = heliY + h * 0.04;
+        const feet = lerp(top + h * 0.2, gy, p);
+        ctx.strokeStyle = 'rgba(30,26,20,0.9)';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.moveTo(heliX + h * 0.02, top); ctx.lineTo(swx + 6 * sc, feet - 100 * sc); ctx.stroke();
+        drawPerson(ctx, swx, feet, sc, { pose: p < 1 ? 'jump' : 'idle', t: time, outfit: OUTFITS.swat, facing: -1, item: p < 1 ? null : 'shield' });
       }
+
+      /* the robber */
+      if (running) bagR = lerp(bagR, 13 + Math.min(14, Math.log(v.mult) * 6), Math.min(1, dt * 3));
+      if (crashed) drawBag(ctx, rx - 46 * sc, gy - bagR * sc * 0.9, bagR * sc, time);
+      // motion streaks behind him at speed
+      if (running && speed > w * 0.55 && !reduced) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        for (let k = 0; k < 6; k++) {
+          const yy = gy + jumpY - (20 + k * 16) * sc;
+          const len = (speed / w) * h * (0.15 + hash(k + Math.floor(time * 8), 91) * 0.2);
+          ctx.strokeStyle = `rgba(255,230,170,${0.10 + 0.1 * hash(k, 92)})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.moveTo(rx - 30 * sc, yy); ctx.lineTo(rx - 30 * sc - len, yy); ctx.stroke();
+        }
+        ctx.restore();
+      }
+      if (crashed && tcr > 0.55) pose = 'kneel';
       const r = drawPerson(ctx, rx, gy + jumpY, sc, {
         pose, ph, t: time, outfit: OUTFITS.robber,
-        bag: v.phase === 'crashed' ? 0 : bagR,
+        bag: crashed ? 0 : bagR,
         item: v.phase === 'betting' ? 'drill' : null,
       });
+      bagAt = crashed ? null : [r.bagX, r.bagY];
+      // caught in the searchlight
+      if (beam && beam.on) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const lg = ctx.createRadialGradient(rx, gy - 60 * sc, 0, rx, gy - 60 * sc, 90 * sc);
+        lg.addColorStop(0, `rgba(255,250,225,${0.22 * beam.a})`);
+        lg.addColorStop(1, 'rgba(255,250,225,0)');
+        ctx.fillStyle = lg;
+        ctx.fillRect(rx - 90 * sc, gy - 150 * sc, 180 * sc, 180 * sc);
+        ctx.restore();
+      }
+      // handcuffs snap on
+      if (crashed && tcr > 0.55) {
+        if (!cuffed) { cuffed = true; sfx.cuffs?.(); for (let k = 0; k < 8; k++) fx.add({ kind: 'spark', x: r.handX, y: r.handY, vx: (Math.random() - 0.5) * h * 0.6, vy: -h * Math.random() * 0.5, g: h * 2, life: 0.35 }); }
+        drawCuffs(ctx, r.handX, r.handY, h * 0.018 * easeOutBack(clamp((tcr - 0.55) / 0.25, 0, 1)));
+      }
 
       // drill sparks during the countdown
       if (v.phase === 'betting') {
-        const tipX = r.handX + 28 * sc, tipY = r.handY - 2 * sc;
-        for (let k = 0; k < 2; k++) {
-          if (Math.random() < 0.7) fx.add({ kind: 'drill', x: tipX, y: tipY, vx: -w * (0.05 + Math.random() * 0.15), vy: -h * (Math.random() * 0.5), g: h * 2.2, life: 0.35 + Math.random() * 0.2 });
+        const tipX = r.handX + 36 * sc, tipY = r.handY - 4 * sc;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const dg = ctx.createRadialGradient(tipX, tipY, 0, tipX, tipY, h * 0.06);
+        dg.addColorStop(0, `rgba(255,220,140,${0.5 + Math.random() * 0.3})`);
+        dg.addColorStop(1, 'rgba(255,180,80,0)');
+        ctx.fillStyle = dg;
+        ctx.fillRect(tipX - h * 0.06, tipY - h * 0.06, h * 0.12, h * 0.12);
+        ctx.restore();
+        for (let k = 0; k < (reduced ? 1 : 3); k++) {
+          if (Math.random() < 0.8) fx.add({ kind: 'spark', x: tipX, y: tipY, vx: -w * (0.05 + Math.random() * 0.2), vy: -h * (Math.random() * 0.6), g: h * 2.2, life: 0.35 + Math.random() * 0.25 });
         }
       }
 
-      if (car) {
-        const cx = rx - car.gap;
-        if (cx > -h * 0.5) drawPoliceCar(ctx, cx, gy + h * 0.085, h * 0.0034, time, wheel, reduced);
-      }
+      if (moto && rx - moto.gap > -h * 0.6) drawMoto(ctx, rx - moto.gap, gy + h * 0.08, h * 0.0034, time, wheel, ph, reduced);
+      if (car && rx - car.gap > -h * 0.9) drawPoliceCar(ctx, rx - car.gap, gy + h * 0.12, h * 0.0044, time, wheel, reduced, 1);
+      if (car2 && crashed) drawPoliceCar(ctx, car2.x, gy + h * 0.12, h * 0.0044, time, wheel * 0.3, reduced, -1);
 
-      // a few coins slip out of the bag at high speed
+      // coins and bills slip out of the bag at speed
       if (running && v.mult > 2) {
         coinAcc += dt * Math.log(v.mult) * 3;
         while (coinAcc > 1) {
           coinAcc -= 1;
-          fx.add({ kind: 'coin', x: rx - 30 * sc, y: gy - 75 * sc + jumpY, vx: -w * (0.02 + Math.random() * 0.06), vy: -h * (0.2 + Math.random() * 0.3), g: h * 2.4, life: 1.4, bounce: 0.4, rot: Math.random() * 6, vr: 10, r: h * 0.011, scroll: 1, floor: gy + (Math.random() - 0.5) * h * 0.03 });
+          fx.add({ kind: 'coin', x: r.bagX, y: r.bagY, vx: -w * (0.02 + Math.random() * 0.06), vy: -h * (0.2 + Math.random() * 0.3), g: h * 2.4, life: 1.4, bounce: 0.4, rot: Math.random() * 6, vr: 10, r: h * 0.011, scroll: 1, floor: gy + (Math.random() - 0.5) * h * 0.03 });
+        }
+      }
+      if (running && v.mult > 5 && !reduced) {
+        billAcc += dt * Math.log(v.mult) * 1.5;
+        while (billAcc > 1) {
+          billAcc -= 1;
+          fx.add({ kind: 'bill', x: r.bagX, y: r.bagY, vx: -w * (0.05 + Math.random() * 0.1), vy: -h * (0.1 + Math.random() * 0.25), g: h * 0.3, drag: 1, life: 2.2, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 8, r: h * 0.016, scroll: 0.6 });
         }
       }
 
+      // rain on the street
+      rain = clamp(rain + dt * (here === 'street' && v.phase !== 'betting' ? 0.6 : -0.8), 0, 1);
+      if (rain > 0 && !reduced) {
+        ctx.strokeStyle = `rgba(180,200,255,${0.35 * rain})`;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        for (let i = 0; i < 90; i++) {
+          const px = ((hash(i, 101) * w * 1.2 - time * w * 0.25 - scroll * 0.2) % (w * 1.2) + w * 1.2) % (w * 1.2) - w * 0.1;
+          const py = ((hash(i, 102) * h + time * h * 1.6) % h);
+          ctx.moveTo(px, py);
+          ctx.lineTo(px - h * 0.012, py + h * 0.035);
+        }
+        ctx.stroke();
+      }
+
+      /* particles */
       fx.shift(dx);
       fx.update(dt);
       fx.each((p, k) => {
@@ -976,91 +689,203 @@ export function createVaultScene() {
           ctx.fill();
           ctx.stroke();
           ctx.globalAlpha = 1;
-        } else if (p.kind === 'spark') {
+        } else if (p.kind === 'homing') {
           const e = easeOut(k);
-          const x = lerp(p.x, p.tx, e), y = lerp(p.y, p.ty, e) - Math.sin(k * Math.PI) * h * 0.06;
-          ctx.fillStyle = k < 0.5 ? C.goldLight : C.gold;
-          ctx.beginPath(); ctx.arc(x, y, Math.max(1.5, h * 0.007) * (1 - k * 0.5), 0, TAU); ctx.fill();
-        } else if (p.kind === 'drill') {
+          const tx = bagAt ? bagAt[0] : p.tx, ty = bagAt ? bagAt[1] : p.ty;
+          const x = lerp(p.x, tx, e), y = lerp(p.y, ty, e) - Math.sin(k * Math.PI) * h * 0.1;
+          const s = Math.max(2, h * 0.009) * (1 - k * 0.6);
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(p.x * 0.1 + k * 6);
+          if (p.gold) {
+            ctx.fillStyle = k < 0.5 ? C.goldLight : C.gold;
+            ctx.beginPath(); ctx.moveTo(0, -s * 1.6); ctx.lineTo(s * 0.5, 0); ctx.lineTo(0, s * 1.6); ctx.lineTo(-s * 0.5, 0); ctx.closePath(); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(-s * 1.6, 0); ctx.lineTo(0, s * 0.5); ctx.lineTo(s * 1.6, 0); ctx.lineTo(0, -s * 0.5); ctx.closePath(); ctx.fill();
+          } else {
+            ctx.fillStyle = '#7fc98a';
+            ctx.fillRect(-s * 1.4, -s * 0.7, s * 2.8, s * 1.4);
+            ctx.fillStyle = '#3f7d4a';
+            ctx.fillRect(-s * 0.3, -s * 0.7, s * 0.6, s * 1.4);
+          }
+          ctx.restore();
+        } else if (p.kind === 'spark') {
           ctx.strokeStyle = `rgba(255,${Math.round(240 - k * 120)},140,${1 - k})`;
-          ctx.lineWidth = 1.5;
+          ctx.lineWidth = 1.6;
           ctx.beginPath();
           ctx.moveTo(p.x, p.y);
-          ctx.lineTo(p.x - p.vx * 0.02, p.y - p.vy * 0.02);
+          ctx.lineTo(p.x - p.vx * 0.025, p.y - p.vy * 0.025);
           ctx.stroke();
+        } else if (p.kind === 'smoke' || p.kind === 'dust') {
+          const rr2 = p.r * (1 + k * 1.6);
+          ctx.fillStyle = p.kind === 'smoke' ? `rgba(120,120,120,${0.45 * (1 - k)})` : `rgba(200,190,170,${0.3 * (1 - k)})`;
+          ctx.beginPath(); ctx.arc(p.x, p.y, rr2, 0, TAU); ctx.fill();
+        } else if (p.kind === 'debris') {
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rot);
+          ctx.globalAlpha = 1 - Math.max(0, k - 0.7) * 3.3;
+          ctx.fillStyle = '#5d7470';
+          ctx.fillRect(-p.r, -p.r * 0.6, p.r * 2, p.r * 1.2);
+          ctx.restore();
+          ctx.globalAlpha = 1;
+        } else if (p.kind === 'bill') {
+          ctx.save();
+          ctx.translate(p.x + Math.sin(p.age * 5 + p.rot) * h * 0.01, p.y);
+          ctx.rotate(p.rot);
+          ctx.scale(1, Math.abs(Math.cos(p.age * 6 + p.rot)) * 0.8 + 0.2);
+          ctx.globalAlpha = 1 - Math.max(0, k - 0.7) * 3.3;
+          ctx.fillStyle = '#7fc98a';
+          ctx.fillRect(-p.r, -p.r * 0.5, p.r * 2, p.r);
+          ctx.fillStyle = '#3f7d4a';
+          ctx.beginPath(); ctx.arc(0, 0, p.r * 0.28, 0, TAU); ctx.fill();
+          ctx.restore();
+          ctx.globalAlpha = 1;
         }
       });
 
-      if (v.phase === 'crashed') {
+      /* busted */
+      if (crashed) {
         const tc = time - crashTime;
-        if (crashZone === 'vault') {
+        if (crashZone === 'vault' || crashZone === 'hall') {
           // steel cage slams down
           const e = reduced ? 1 : easeOutBack(tc / 0.42);
-          const bottom = lerp(-h * 0.1, gy + h * 0.01, e);
-          const cageW = h * 0.42;
-          const left = rx - cageW / 2;
-          for (let i = 0; i <= 8; i++) {
-            const x = left + (i / 8) * cageW;
+          const bottom = lerp(-h * 0.1, gy + h * 0.015, e);
+          if (!slamDone && tc > 0.32) {
+            slamDone = true;
+            if (!reduced) shake = Math.max(shake, 0.8);
+            for (let k = 0; k < (reduced ? 4 : 16); k++) fx.add({ kind: 'dust', x: rx + (Math.random() - 0.5) * h * 0.45, y: gy + h * 0.01, vx: (Math.random() - 0.5) * h * 0.6, vy: -h * Math.random() * 0.15, drag: 3, life: 0.8, r: h * 0.025 });
+          }
+          const cageW = h * 0.44, left = rx - cageW / 2;
+          for (let i = 0; i <= 9; i++) {
+            const x = left + (i / 9) * cageW;
             const g = ctx.createLinearGradient(x - 3, 0, x + 3, 0);
-            g.addColorStop(0, C.steelDark);
-            g.addColorStop(0.5, C.steel);
-            g.addColorStop(1, C.steelDark);
+            g.addColorStop(0, C.steelDark); g.addColorStop(0.5, '#eef6f4'); g.addColorStop(1, C.steelDark);
             ctx.fillStyle = g;
             ctx.fillRect(x - Math.max(2, h * 0.007), bottom - h * 1.2, Math.max(4, h * 0.014), h * 1.2);
           }
-          ctx.fillStyle = C.steelDark;
-          ctx.fillRect(left - 6, bottom - h * 0.42, cageW + 12, Math.max(4, h * 0.016));
-          ctx.fillRect(left - 6, bottom - 4, cageW + 12, Math.max(5, h * 0.018));
+          ctx.fillStyle = vg2(ctx, bottom - h * 0.44, bottom - h * 0.42);
+          ctx.fillRect(left - 8, bottom - h * 0.44, cageW + 16, Math.max(5, h * 0.02));
+          ctx.fillRect(left - 8, bottom - 5, cageW + 16, Math.max(6, h * 0.022));
           const a = reduced ? 0.16 : 0.1 + 0.1 * (0.5 + 0.5 * Math.sin(tc * TAU * 1.1));
           ctx.fillStyle = `rgba(255,40,40,${a})`;
-          ctx.fillRect(-20, -20, w + 40, h + 40);
-        } else {
-          // police lights wash over everything
+          ctx.fillRect(-30, -30, w + 60, h + 60);
+        } else if (crashZone === 'roof') {
+          // the helicopter drops a net
+          const e = reduced ? 1 : easeOutBack(tc / 0.55);
+          const bottom = lerp(heliY + h * 0.05, gy + h * 0.01, e);
+          ctx.strokeStyle = 'rgba(230,220,190,0.6)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.moveTo(heliX, heliY + h * 0.05); ctx.lineTo(rx, bottom - h * 0.36); ctx.stroke();
+          drawNet(ctx, rx, bottom, h * 0.42, h * 0.36);
           const red = reduced ? true : Math.floor(tc * 2.4) % 2 === 0;
-          ctx.fillStyle = red ? 'rgba(255,40,60,0.13)' : 'rgba(60,90,255,0.13)';
-          ctx.fillRect(-20, -20, w + 40, h + 40);
-          // handcuffs pop above the robber
-          if (tc > 0.45) {
-            const s = easeOutBack((tc - 0.45) / 0.35);
-            drawCuffs(ctx, rx + 4 * sc, gy - 150 * sc, h * 0.05 * s);
-          }
+          ctx.fillStyle = red ? 'rgba(255,40,60,0.12)' : 'rgba(60,90,255,0.12)';
+          ctx.fillRect(-30, -30, w + 60, h + 60);
+        } else {
+          // police lights wash over everything, cuffs pop above the robber
+          const red = reduced ? true : Math.floor(tc * 2.4) % 2 === 0;
+          ctx.fillStyle = red ? 'rgba(255,40,60,0.14)' : 'rgba(60,90,255,0.14)';
+          ctx.fillRect(-30, -30, w + 60, h + 60);
+        }
+        // police tape sweeps across the foreground
+        if (tc > 0.8) {
+          const p = reduced ? 1 : easeOut((tc - 0.8) / 0.5);
+          drawTape(ctx, -20, h * 0.95, w + 20, h * 0.87, p, h);
+          drawTape(ctx, w + 20, h * 0.99, -20, h * 0.9, reduced ? 1 : easeOut((tc - 1.0) / 0.5), h);
         }
       } else if (running && here !== 'vault') {
         // red/blue siren tint at the edges
         const red = reduced ? true : Math.floor(time * 2.4) % 2 === 0;
         const eg = ctx.createLinearGradient(0, 0, w * 0.35, 0);
-        eg.addColorStop(0, red ? 'rgba(255,40,60,0.22)' : 'rgba(60,90,255,0.22)');
+        eg.addColorStop(0, red ? 'rgba(255,40,60,0.24)' : 'rgba(60,90,255,0.24)');
         eg.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.fillStyle = eg;
-        ctx.fillRect(-20, -20, w * 0.35 + 20, h + 40);
+        ctx.fillRect(-30, -30, w * 0.35 + 30, h + 60);
+      }
+
+      // golden glow as the haul grows
+      if (running && v.mult > 2) {
+        const k = clamp(Math.log(v.mult) / Math.log(50), 0, 1);
+        const gg = ctx.createRadialGradient(rx, gy - 60 * sc, 0, rx, gy - 60 * sc, h * 0.5);
+        gg.addColorStop(0, `rgba(255,200,80,${0.12 * k})`);
+        gg.addColorStop(1, 'rgba(255,200,80,0)');
+        ctx.fillStyle = gg;
+        ctx.fillRect(rx - h * 0.5, gy - 60 * sc - h * 0.5, h, h);
       }
 
       const vg = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.75);
       vg.addColorStop(0, 'rgba(0,0,0,0)');
-      vg.addColorStop(1, 'rgba(0,0,0,0.5)');
+      vg.addColorStop(1, 'rgba(0,0,0,0.55)');
       ctx.fillStyle = vg;
-      ctx.fillRect(-20, -20, w + 40, h + 40);
+      ctx.fillRect(-30, -30, w + 60, h + 60);
       ctx.restore();
+
+      // explosion flash
+      flash = Math.max(0, flash - dt * 2.5);
+      if (flash > 0) {
+        ctx.fillStyle = `rgba(255,245,220,${flash})`;
+        ctx.fillRect(0, 0, w, h);
+      }
+
+      // zone banner
+      if (banner) {
+        const t = time - banner.t0;
+        if (t > 2.4) banner = null;
+        else {
+          const a = clamp(t / 0.25, 0, 1) * clamp((2.4 - t) / 0.4, 0, 1);
+          const slide = (1 - easeOut(t / 0.35)) * -w * 0.08;
+          const fs = Math.max(14, Math.round(h * 0.045));
+          ctx.save();
+          ctx.globalAlpha = a;
+          ctx.font = `400 ${fs}px "Bungee", Impact, sans-serif`;
+          const tw = ctx.measureText(banner.name).width;
+          const bx = w * 0.03 + slide, by = h * 0.06;
+          ctx.fillStyle = 'rgba(8,12,14,0.72)';
+          rr(ctx, bx, by, tw + fs * 1.6, fs * 1.7, fs * 0.4);
+          ctx.fill();
+          ctx.fillStyle = banner.red ? '#ff4d4d' : '#e8b24a';
+          ctx.fillRect(bx, by, fs * 0.25, fs * 1.7);
+          ctx.fillStyle = banner.red ? '#ff8a8a' : '#ffd77a';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(banner.name, bx + fs * 0.85, by + fs * 0.88);
+          ctx.restore();
+        }
+      }
     },
   };
 }
 
-function drawBagOnFloor(ctx, x, y, r) {
-  ctx.fillStyle = '#6a421f';
-  ctx.strokeStyle = '#3c2510';
-  ctx.lineWidth = 2;
+// "POLICE LINE - DO NOT CROSS" tape from (x1,y1) towards (x2,y2), drawn up to `p` of its length.
+function drawTape(ctx, x1, y1, x2, y2, p, h) {
+  if (p <= 0) return;
+  const len = Math.hypot(x2 - x1, y2 - y1) * p;
+  const th = Math.max(16, h * 0.045);
+  ctx.save();
+  ctx.translate(x1, y1);
+  ctx.rotate(Math.atan2(y2 - y1, x2 - x1));
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.fillRect(0, -th / 2 + 4, len, th);
+  ctx.fillStyle = '#f5c518';
+  ctx.fillRect(0, -th / 2, len, th);
+  ctx.fillStyle = 'rgba(0,0,0,0.85)';
+  ctx.fillRect(0, -th / 2, len, th * 0.09);
+  ctx.fillRect(0, th / 2 - th * 0.09, len, th * 0.09);
   ctx.beginPath();
-  ctx.ellipse(x, y - r * 0.6, r * 1.1, r * 0.7, 0, 0, TAU);
-  ctx.fill();
-  ctx.stroke();
+  ctx.rect(0, -th / 2, len, th);
+  ctx.clip();
+  ctx.fillStyle = '#111';
+  ctx.font = `900 ${Math.round(th * 0.55)}px "Chakra Petch", system-ui, sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  const label = 'POLICE LINE  •  DO NOT CROSS  •  ';
+  const lw = ctx.measureText(label).width;
+  for (let x = 6; x < len; x += lw) ctx.fillText(label, x, 1);
+  ctx.restore();
 }
 
-function drawCuffs(ctx, x, y, r) {
-  if (r <= 0) return;
-  ctx.strokeStyle = '#d7dde5';
-  ctx.lineWidth = Math.max(2, r * 0.22);
-  ctx.beginPath(); ctx.arc(x - r * 0.75, y, r * 0.55, 0, TAU); ctx.stroke();
-  ctx.beginPath(); ctx.arc(x + r * 0.75, y, r * 0.55, 0, TAU); ctx.stroke();
-  ctx.lineWidth = Math.max(1.5, r * 0.12);
-  ctx.beginPath(); ctx.moveTo(x - r * 0.2, y); ctx.lineTo(x + r * 0.2, y); ctx.stroke();
+function vg2(ctx, y0, y1) {
+  const g = ctx.createLinearGradient(0, y0, 0, y1);
+  g.addColorStop(0, '#d8e4e2');
+  g.addColorStop(1, '#3d5551');
+  return g;
 }
