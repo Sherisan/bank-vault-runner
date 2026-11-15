@@ -208,9 +208,32 @@ main:focus { outline: none; }
 .history.compact { padding: 0; overflow: hidden; flex-wrap: nowrap; mask-image: linear-gradient(90deg, #000 80%, transparent); }
 .history.compact .hchip { font-size: 12px; padding: 2px 8px; }
 
-.game-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 18px; align-items: start; }
+.game-grid { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 18px; align-items: start; }
 .play-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.bets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.side-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.bets { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+/* Compact bet panels in the side column */
+.side-col .bets { gap: 10px; }
+.side-col .bet-panel { padding: 10px; gap: 8px; border-radius: 12px; }
+.side-col .bet-row { gap: 8px; grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr); }
+.side-col .amount { gap: 6px; }
+.side-col .stepper { grid-template-columns: 32px minmax(0, 1fr) 32px; border-radius: 8px; }
+.side-col .stepper input { font-size: 15px; padding: 5px 2px; }
+.side-col .chips { gap: 4px; }
+.side-col .chip { padding: 3px 0; font-size: 12px; min-height: 0; }
+.side-col .btn-main { min-height: 0; padding: 6px 8px; border-radius: 10px; }
+.side-col .btn-verb { font-size: 16px; }
+.side-col .btn-main small { font-size: 11px; }
+.side-col .btn-amount { font-size: 20px; }
+.side-col .auto-row { padding-top: 7px; gap: 6px 10px; flex-wrap: nowrap; }
+.side-col .auto-cash { gap: 6px; }
+.side-col .toggle { gap: 6px; font-size: 12.5px; }
+.side-col .toggle-track { width: 30px; height: 18px; }
+.side-col .toggle-thumb { width: 12px; height: 12px; }
+.side-col .toggle input:checked + .toggle-track .toggle-thumb { transform: translateX(12px); }
+.side-col .auto-input { border-radius: 6px; padding: 0 6px 0 2px; }
+.side-col .auto-input input { width: 46px; padding: 3px 2px; font-size: 13px; }
+.side-col .last-result { font-size: 12px; min-height: 0; margin-top: -2px; }
 
 .bet-panel {
   background: var(--bg2); border: 1px solid var(--line); border-radius: 14px;
@@ -279,8 +302,7 @@ kbd { font-family: var(--font-ui); font-size: 12px; padding: 1px 7px; border: 1p
 .live {
   background: var(--bg2); border: 1px solid var(--line); border-radius: 14px;
   display: flex; flex-direction: column;
-  position: sticky; top: 84px;
-  max-height: calc(100vh - 100px); min-height: 420px;
+  max-height: 520px; min-height: 300px;
   overflow: hidden;
 }
 .tabs { display: grid; grid-template-columns: 1fr 1fr; padding: 6px; gap: 4px; border-bottom: 1px solid var(--line); }
@@ -336,7 +358,7 @@ kbd { font-family: var(--font-ui); font-size: 12px; padding: 1px 7px; border: 1p
 /* ───────── Responsive ───────── */
 @media (max-width: 1100px) {
   .game-grid { grid-template-columns: minmax(0, 1fr); }
-  .live { position: static; max-height: 520px; }
+  .bets { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 820px) {
   .bets { grid-template-columns: minmax(0, 1fr); }

@@ -45,13 +45,15 @@ export default function GamePage({ game }) {
       <div className="game-grid">
         <div className="play-col">
           <Stage game={game} engine={engine} />
+          <p className="kbd-hint">Press <kbd>Space</kbd> to bet, cancel or cash out with bet 1.</p>
+        </div>
+        <div className="side-col">
           <div className="bets">
             <BetPanel engine={engine} slot="A" index={1} />
             <BetPanel engine={engine} slot="B" index={2} />
           </div>
-          <p className="kbd-hint">Press <kbd>Space</kbd> to bet, cancel or cash out with bet 1.</p>
+          <LiveBets engine={engine} />
         </div>
-        <LiveBets engine={engine} />
       </div>
     </main>
   );

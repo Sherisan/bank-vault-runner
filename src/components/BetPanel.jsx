@@ -97,7 +97,7 @@ export default function BetPanel({ engine, slot, index }) {
     <section className={`bet-panel status-${b.status}`} aria-label={`Bet ${index}`}>
       <div className="bet-row">
         <div className="amount">
-          <label className="field-label" htmlFor={`${uid}-amt`}>Bet amount</label>
+          <label className="sr-only" htmlFor={`${uid}-amt`}>Bet amount</label>
           <div className="stepper">
             <button className="step" aria-label="Decrease bet" disabled={locked} onClick={() => setAmount(b.amount / 2)}>½</button>
             <input
@@ -123,7 +123,7 @@ export default function BetPanel({ engine, slot, index }) {
       <div className="auto-row">
         <Toggle id={`${uid}-ab`} checked={b.autoBet} label="Auto bet" onChange={(v) => engine.configure(slot, { autoBet: v })} />
         <div className="auto-cash">
-          <Toggle id={`${uid}-ac`} checked={b.autoCash} label="Auto cash out at" onChange={(v) => engine.configure(slot, { autoCash: v })} />
+          <Toggle id={`${uid}-ac`} checked={b.autoCash} label="Cash out at" onChange={(v) => engine.configure(slot, { autoCash: v })} />
           <div className={`auto-input${b.autoCash ? '' : ' off'}`}>
             <input
               aria-label="Auto cash-out multiplier"
@@ -138,11 +138,12 @@ export default function BetPanel({ engine, slot, index }) {
           </div>
         </div>
       </div>
-      <p className={`last-result ${b.last?.type || ''}`}>
-        {b.last?.type === 'win' && <>Won <strong>{money(b.last.amount)}</strong> at {b.last.at.toFixed(2)}×</>}
-        {b.last?.type === 'loss' && <>Lost {money(b.last.amount)} when it crashed at {b.last.at.toFixed(2)}×</>}
-        {!b.last && <>Cash out before the crash to win your bet × the multiplier.</>}
-      </p>
+      {b.last && (
+        <p className={`last-result ${b.last.type}`}>
+          {b.last.type === 'win' && <>Won <strong>{money(b.last.amount)}</strong> at {b.last.at.toFixed(2)}×</>}
+          {b.last.type === 'loss' && <>Lost {money(b.last.amount)} at {b.last.at.toFixed(2)}×</>}
+        </p>
+      )}
     </section>
   );
 }
