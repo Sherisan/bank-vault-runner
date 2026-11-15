@@ -8,7 +8,8 @@ export const OUTFITS = {
   robber: {
     skin: '#e8ae80', torso: '#f5eedd', stripes: '#191b27', sleeve: '#1d1f2c', pants: '#2a3050',
     shoe: '#c0392b', sole: '#f2efe6', laces: '#f2efe6', glove: '#14151c', mask: '#17181f',
-    scarf: '#e0413a', collar: '#191b27',
+    scarf: '#e0413a', collar: '#191b27', belt: '#2b2118', pouches: '#3a3a2a', strap: true,
+    build: { leg: 20, legW: 14.5, arm: 14.5, armW: 11.5, torso: 1.12, head: 1.16, shoe: 1.18 },
     hat: { type: 'beanie', color: '#1a1b26', pom: '#e04848' },
   },
   police: {
@@ -325,17 +326,45 @@ function torsoPath(ctx, g, belly) {
 
 function drawScarf(ctx, nx, ny, t, wind, color) {
   for (let k = 1; k >= 0; k--) {
-    const pts = [];
-    const L = 8;
+    const L = 10, pts = [];
     for (let i = 0; i <= L; i++) {
       const u = i / L;
       pts.push([
-        nx - 4 - u * (22 + 30 * wind) - k * 4,
-        ny + 2 + k * 5 + u * (wind > 0.5 ? 6 : 28) + Math.sin(t * 15 - u * 5 + k * 1.7) * u * 7 * wind,
+        nx - 4 - k * 3 - u * (9 + 44 * wind),
+        ny + 3 + k * 4 + u * (30 - 26 * wind) + Math.sin(t * (5 + 11 * wind) - u * 5 + k * 1.7) * u * (2.5 + 6 * wind),
       ]);
     }
-    for (let i = 0; i < L; i++) limb(ctx, [pts[i], pts[i + 1]], 10.5 - i * 0.8, INK);
-    for (let i = 0; i < L; i++) limb(ctx, [pts[i], pts[i + 1]], 7.5 - i * 0.65, k ? shade(color, 0.8) : color);
+    const left = [], right = [];
+    for (let i = 0; i <= L; i++) {
+      const p = pts[i], q = pts[Math.min(L, i + 1)], o = pts[Math.max(0, i - 1)];
+      let dx = q[0] - o[0], dy = q[1] - o[1];
+      const d = Math.hypot(dx, dy) || 1;
+      dx /= d; dy /= d;
+      const hw = (4.6 - i * 0.16) * (k ? 0.88 : 1);
+      left.push([p[0] - dy * hw, p[1] + dx * hw]);
+      right.push([p[0] + dy * hw, p[1] - dx * hw]);
+    }
+    ctx.beginPath();
+    ctx.moveTo(left[0][0], left[0][1]);
+    for (const p of left) ctx.lineTo(p[0], p[1]);
+    for (let i = L; i >= 0; i--) ctx.lineTo(right[i][0], right[i][1]);
+    ctx.closePath();
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = INK;
+    ctx.stroke();
+    ctx.fillStyle = k ? shade(color, 0.75) : color;
+    ctx.fill();
+    // a white band near the end and a frayed fringe
+    const e = pts[L - 2];
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.beginPath(); ctx.arc(e[0], e[1], 2.2, 0, TAU); ctx.fill();
+    ctx.strokeStyle = k ? shade(color, 0.75) : color;
+    ctx.lineWidth = 1.4;
+    for (let f = -1; f <= 1; f++) {
+      const p = pts[L];
+      ctx.beginPath(); ctx.moveTo(p[0], p[1] + f * 2); ctx.lineTo(p[0] - 5, p[1] + f * 3 + Math.sin(t * 12 + f) * 1.5); ctx.stroke();
+    }
   }
 }
 
@@ -344,6 +373,7 @@ function drawScarf(ctx, nx, ny, t, wind, color) {
  */
 export function drawPerson(ctx, x, y, sc, o) {
   const f = o.outfit;
+  const B = { leg: 23, legW: 12, arm: 16, armW: 9.5, torso: 1, head: 1, shoe: 1, ...(f.build || {}) };
   const pose = o.pose || 'idle';
   const ph = o.ph || 0, t = o.t || 0;
   ctx.save();
@@ -363,7 +393,7 @@ export function drawPerson(ctx, x, y, sc, o) {
   const moving = pose === 'run' || pose === 'walk' || pose === 'grab';
   const walk = pose === 'walk';
   const amp = o.amp ?? (walk ? 0.55 : 0.95);
-  let hipY = -47, lean = 0.04, bob = 0;
+  let hipY = -(B.leg * 2 + 1), lean = 0.04, bob = 0;
   if (moving) { bob = -Math.abs(Math.sin(ph)) * (walk ? 2.5 : 6.5); lean = walk ? 0.08 : 0.34; }
   if (pose === 'grab') lean = 0.5;
   if (pose === 'idle') bob = Math.sin(t * 2.4) * 1.2;
@@ -371,7 +401,7 @@ export function drawPerson(ctx, x, y, sc, o) {
   if (pose === 'jump') lean = 0.26;
   if (pose === 'slide') { lean = -1.05; hipY = -10; }
   if (pose === 'ride') { lean = 0.28; hipY = -40; }
-  if (pose === 'kneel') { lean = 0.02; hipY = -27; }
+  if (pose === 'kneel') { lean = 0.02; hipY = -(B.leg + 4); }
   hipY += bob;
   const hipX = 0;
 
@@ -389,9 +419,9 @@ export function drawPerson(ctx, x, y, sc, o) {
   };
   const drawLeg = (side, color) => {
     const [th, sh] = legAngles(side);
-    const knee = joint(hipX, hipY, th, 23);
-    const foot = joint(knee[0], knee[1], sh, 23);
-    hiLimb(ctx, [[hipX, hipY], knee, foot], 12, color);
+    const knee = joint(hipX, hipY, th, B.leg);
+    const foot = joint(knee[0], knee[1], sh, B.leg);
+    hiLimb(ctx, [[hipX, hipY], knee, foot], B.legW, color);
     if (f.knee) {
       ctx.fillStyle = INK;
       ctx.beginPath(); ctx.arc(knee[0] + 2, knee[1], 7, 0, TAU); ctx.fill();
@@ -402,6 +432,7 @@ export function drawPerson(ctx, x, y, sc, o) {
     ctx.save();
     ctx.translate(foot[0], foot[1]);
     ctx.rotate(rot);
+    ctx.scale(B.shoe, B.shoe);
     ctx.fillStyle = INK;
     rr(ctx, -6.5, -6.5, 22, 11.5, 5.5);
     ctx.fill();
@@ -419,7 +450,7 @@ export function drawPerson(ctx, x, y, sc, o) {
     ctx.restore();
   };
 
-  const sx = hipX + Math.sin(lean) * 36, sy = hipY - Math.cos(lean) * 36;
+  const sx = hipX + Math.sin(lean) * 36 * B.torso, sy = hipY - Math.cos(lean) * 36 * B.torso;
   const arm = (side) => {
     if (pose === 'hands') return side === 0 ? [Math.PI - 0.3, Math.PI - 0.12] : [Math.PI + 0.25, Math.PI + 0.1];
     if (pose === 'grab') return side === 0 ? [1.45, 1.6] : [1.2, 1.5];
@@ -439,9 +470,9 @@ export function drawPerson(ctx, x, y, sc, o) {
     const [ua, fa] = arm(side);
     const ox = side === 0 ? sx + 2 : sx - 3;
     const oy = sy + 1;
-    const el = joint(ox, oy, ua, 16);
-    const hand = joint(el[0], el[1], fa, 15);
-    hiLimb(ctx, [[ox, oy], el, hand], 9.5, color);
+    const el = joint(ox, oy, ua, B.arm);
+    const hand = joint(el[0], el[1], fa, B.arm * 0.94);
+    hiLimb(ctx, [[ox, oy], el, hand], B.armW, color);
     ctx.fillStyle = INK;
     ctx.beginPath(); ctx.arc(hand[0], hand[1], 6.6, 0, TAU); ctx.fill();
     ctx.fillStyle = f.glove || f.skin;
@@ -475,6 +506,7 @@ export function drawPerson(ctx, x, y, sc, o) {
   ctx.save();
   ctx.translate(hipX, hipY);
   ctx.rotate(lean);
+  ctx.scale(B.torso, B.torso);
   ctx.fillStyle = INK;
   torsoPath(ctx, -1.6, f.belly);
   ctx.fill();
@@ -526,6 +558,24 @@ export function drawPerson(ctx, x, y, sc, o) {
       ctx.fillRect(-8, 1, 1.4, 5); ctx.fillRect(-5, 1.5, 1.4, 4.5);
     }
   }
+  if (f.strap && o.bag) {
+    ctx.lineCap = 'butt';
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 7.5;
+    ctx.beginPath(); ctx.moveTo(-15, -41); ctx.lineTo(15, -5); ctx.stroke();
+    ctx.strokeStyle = '#7a4e24';
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    ctx.fillStyle = '#e8b24a';
+    rr(ctx, -3, -26, 6, 5, 1); ctx.fill();
+  }
+  if (f.pouches) {
+    for (const px of [-10, 6]) {
+      ctx.fillStyle = INK; rr(ctx, px - 1, -10, 8, 9, 2); ctx.fill();
+      ctx.fillStyle = f.pouches; rr(ctx, px, -9, 6, 7, 1.5); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(px, -9, 6, 1.6);
+    }
+  }
   if (f.patch) { ctx.fillStyle = f.patch; rr(ctx, -10, -34, 6.5, 7, 1.5); ctx.fill(); }
   // light from the front, shadow at the back
   const lg = ctx.createLinearGradient(-14, 0, 16, 0);
@@ -573,10 +623,11 @@ export function drawPerson(ctx, x, y, sc, o) {
 
   // head
   const scared = pose === 'hands' || pose === 'kneel';
-  const hx = sx + Math.sin(lean) * 15 + 3, hy = sy - Math.cos(lean) * 15 - 3;
+  const hx = sx + Math.sin(lean) * 15 * B.torso + 3, hy = sy - Math.cos(lean) * 15 * B.torso - 3;
   ctx.save();
   ctx.translate(hx, hy);
   ctx.rotate(lean * 0.4);
+  ctx.scale(B.head, B.head);
   const head = (g) => {
     ctx.beginPath();
     ctx.arc(0, -1, 14 + g, 0, TAU);
@@ -607,38 +658,51 @@ export function drawPerson(ctx, x, y, sc, o) {
   ctx.beginPath(); ctx.arc(16.5, 1.2, 1.1, 0, TAU); ctx.fill();
 
   if (f.mask) {
-    // balaclava: eye opening with a sly slant, mouth hole
+    // balaclava: wide eye opening, big determined eyes, cocky grin
     ctx.fillStyle = INK;
-    rr(ctx, 0, -8, 17, 11.5, 5.5);
-    ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-0.6, -9.8); ctx.lineTo(18.2, -7.6); ctx.quadraticCurveTo(19.8, 4.2, 14, 4.8); ctx.lineTo(3, 4.8); ctx.quadraticCurveTo(-1.8, 4.2, -0.6, -9.8); ctx.closePath(); ctx.fill();
     ctx.fillStyle = f.skin;
-    rr(ctx, 1, -7, 15, 9.5, 4.5);
-    ctx.fill();
-    ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.ellipse(6.4, -2.2, 3.3, 3.6, 0, 0, TAU); ctx.ellipse(12.6, -2.2, 2.9, 3.4, 0, 0, TAU); ctx.fill();
-    const look = scared ? -1 : 1;
-    ctx.fillStyle = '#18120c';
-    ctx.beginPath(); ctx.arc(6.8 + look, -1.8, 1.8, 0, TAU); ctx.arc(12.9 + look, -1.8, 1.7, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(7.4 + look, -2.7, 0.7, 0, TAU); ctx.arc(13.5 + look, -2.7, 0.65, 0, TAU); ctx.fill();
-    // the mask's brow edge slants down: a cheeky, determined look
-    ctx.fillStyle = f.mask;
+    ctx.beginPath(); ctx.moveTo(0.9, -8.4); ctx.lineTo(16.9, -6.5); ctx.quadraticCurveTo(18.2, 3.2, 13.6, 3.5); ctx.lineTo(3.4, 3.5); ctx.quadraticCurveTo(-0.2, 3.2, 0.9, -8.4); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    ctx.fillRect(1, 0.5, 16.5, 3);
+    const look = scared ? -1.2 : 1.1;
+    for (const [ex, ew, eh] of [[6.6, 3.7, 4.3], [13.1, 3.2, 4]]) {
+      ctx.fillStyle = INK;
+      ctx.beginPath(); ctx.ellipse(ex, -2, ew + 1, eh + 1, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(ex, -2, ew, eh, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#3a2614';
+      ctx.beginPath(); ctx.arc(ex + look, -1.4, scared ? 1.5 : 2.2, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#0c0805';
+      ctx.beginPath(); ctx.arc(ex + look, -1.4, scared ? 0.9 : 1.3, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(ex + look + 0.8, -2.6, 0.8, 0, TAU); ctx.fill();
+    }
+    // brows: knitted down when running, raised when caught
+    ctx.strokeStyle = f.mask;
+    ctx.lineWidth = 2.8;
+    ctx.lineCap = 'round';
     ctx.beginPath();
-    if (scared) { ctx.moveTo(0, -8); ctx.lineTo(17, -8); ctx.lineTo(0, -4.5); }
-    else { ctx.moveTo(0, -8); ctx.lineTo(17, -8); ctx.lineTo(17, -3.6); }
-    ctx.closePath();
-    ctx.fill();
+    if (scared) { ctx.moveTo(3, -8.6); ctx.quadraticCurveTo(6.6, -10.4, 9.6, -8.2); ctx.moveTo(10.6, -8); ctx.quadraticCurveTo(13.4, -9.8, 16.2, -7.6); }
+    else { ctx.moveTo(2.6, -8.2); ctx.lineTo(9.4, -5.6); ctx.moveTo(10.8, -5.5); ctx.lineTo(16.4, -7.2); }
+    ctx.stroke();
     // mouth hole
     ctx.fillStyle = INK;
-    ctx.beginPath(); ctx.ellipse(11, 9.5, 6, scared ? 5 : 3.9, 0, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(11.6, 10.2, 6.8, scared ? 5.4 : 4.4, 0, 0, TAU); ctx.fill();
     ctx.fillStyle = f.skin;
-    ctx.beginPath(); ctx.ellipse(11, 9.5, 4.9, scared ? 3.9 : 2.8, 0, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#4a1414';
-    if (scared) { ctx.beginPath(); ctx.ellipse(11, 9.8, 2.6, 2.8, 0, 0, TAU); ctx.fill(); }
-    else {
-      ctx.beginPath(); ctx.moveTo(7.5, 8.6); ctx.quadraticCurveTo(11, 13, 14.8, 8.4); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(11.6, 10.2, 5.6, scared ? 4.2 : 3.2, 0, 0, TAU); ctx.fill();
+    if (scared) {
+      ctx.fillStyle = '#4a1414';
+      ctx.beginPath(); ctx.ellipse(11.6, 10.6, 2.8, 3, 0, 0, TAU); ctx.fill();
+    } else {
+      ctx.fillStyle = '#4a1414';
+      ctx.beginPath(); ctx.moveTo(7.4, 9.1); ctx.quadraticCurveTo(11.6, 15, 16, 8.6); ctx.quadraticCurveTo(11.6, 10.8, 7.4, 9.1); ctx.fill();
       ctx.fillStyle = '#fff';
-      ctx.fillRect(8.3, 8.4, 6, 1.4);
+      ctx.beginPath(); ctx.moveTo(8.2, 9.4); ctx.quadraticCurveTo(11.6, 11.2, 15.2, 9); ctx.lineTo(15, 10.4); ctx.quadraticCurveTo(11.6, 12.2, 8.4, 10.6); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#ffcf3a';
+      ctx.fillRect(12.4, 9.9, 1.8, 1.8);
+      ctx.fillStyle = '#fff8d0';
+      ctx.fillRect(12.6, 10, 0.7, 0.7);
     }
   } else {
     if (f.shades) {

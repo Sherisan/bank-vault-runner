@@ -397,6 +397,17 @@ kbd { font-family: var(--font-ui); font-size: 12px; padding: 1px 7px; border: 1p
   filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.45)) drop-shadow(0 0 22px rgba(255, 200, 90, 0.35));
   text-shadow: none;
 }
+/* Running multiplier: a compact HUD pill at the top of the stage */
+.stage[data-phase='running'] .stage-overlay { padding-top: 10px; }
+.ov-run {
+  flex-direction: row; align-items: center; gap: 10px;
+  padding: 4px 16px 4px 12px; border-radius: 999px;
+  background: rgba(6, 12, 14, 0.62); backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 210, 120, 0.35);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 240, 200, 0.1);
+}
+.ov-run .ov-label { background: none; border: 0; backdrop-filter: none; padding: 0; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255, 233, 176, 0.8); }
+.ov-run .ov-mult { font-size: clamp(26px, 4.5vw, 58px); filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.45)) drop-shadow(0 0 14px rgba(255, 200, 90, 0.35)); }
 .ov-mult[data-tier='mid'] { color: transparent; }
 .ov-mult[data-tier='high'] { color: transparent; text-shadow: none; filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.45)) drop-shadow(0 0 40px rgba(255, 190, 60, 0.75)); }
 .ov-mult.crashed { background: linear-gradient(180deg, #ffd0d0, #ff4d4d 60%, #b31c1c); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.5)) drop-shadow(0 0 26px rgba(255, 60, 60, 0.6)); }
