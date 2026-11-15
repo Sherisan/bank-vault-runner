@@ -9,6 +9,7 @@ export const OUTFITS = {
     skin: '#e8ae80', torso: '#f5eedd', stripes: '#191b27', sleeve: '#1d1f2c', pants: '#2a3050',
     shoe: '#c0392b', sole: '#f2efe6', laces: '#f2efe6', glove: '#14151c', mask: '#17181f',
     scarf: '#e0413a', collar: '#191b27', belt: '#2b2118', pouches: '#3a3a2a', strap: true,
+    jacket: '#1c1f2a', headset: true, cargo: true,
     build: { leg: 20, legW: 14.5, arm: 14.5, armW: 11.5, torso: 1.12, head: 1.16, shoe: 1.18 },
     hat: { type: 'beanie', color: '#1a1b26', pom: '#e04848' },
   },
@@ -402,6 +403,7 @@ export function drawPerson(ctx, x, y, sc, o) {
   if (pose === 'slide') { lean = -1.05; hipY = -10; }
   if (pose === 'ride') { lean = 0.28; hipY = -40; }
   if (pose === 'kneel') { lean = 0.02; hipY = -(B.leg + 4); }
+  if (pose === 'type') { lean = 0.14; bob = Math.sin(t * 2.2) * 0.8; }
   hipY += bob;
   const hipX = 0;
 
@@ -422,6 +424,19 @@ export function drawPerson(ctx, x, y, sc, o) {
     const knee = joint(hipX, hipY, th, B.leg);
     const foot = joint(knee[0], knee[1], sh, B.leg);
     hiLimb(ctx, [[hipX, hipY], knee, foot], B.legW, color);
+    if (f.cargo) {
+      const mx = (hipX + knee[0]) / 2, my = (hipY + knee[1]) / 2;
+      ctx.save();
+      ctx.translate(mx, my);
+      ctx.rotate(-th);
+      ctx.fillStyle = INK;
+      rr(ctx, -B.legW * 0.42, -4, B.legW * 0.84, 10, 2); ctx.fill();
+      ctx.fillStyle = shade(color, 1.12);
+      rr(ctx, -B.legW * 0.34, -3.2, B.legW * 0.68, 8.4, 1.6); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.fillRect(-B.legW * 0.34, -3.2, B.legW * 0.68, 2.4);
+      ctx.restore();
+    }
     if (f.knee) {
       ctx.fillStyle = INK;
       ctx.beginPath(); ctx.arc(knee[0] + 2, knee[1], 7, 0, TAU); ctx.fill();
@@ -458,6 +473,10 @@ export function drawPerson(ctx, x, y, sc, o) {
     if (pose === 'slide') return side === 0 ? [0.5, 1.2] : [-0.4, 0.2];
     if (pose === 'ride') return [1.2, 1.5];
     if (pose === 'kneel') return side === 0 ? [-0.55, -1.5] : [-0.45, -1.4];
+    if (pose === 'type') {
+      const tap = Math.sin(t * 26 + side * 1.9) * 0.07;
+      return side === 0 ? [1.0 + tap, 1.72 + tap * 2] : [0.82 - tap, 1.62 - tap * 2];
+    }
     if (o.item === 'drill' && side === 0) return [1.3, 1.55];
     if (o.item === 'shield' && side === 0) return [1.1, 2.0];
     if (moving) {
@@ -515,7 +534,21 @@ export function drawPerson(ctx, x, y, sc, o) {
   ctx.clip();
   ctx.fillStyle = f.torso;
   ctx.fillRect(-20, -46, 46, 52);
-  if (f.stripes) {
+  if (f.stripes && f.jacket) {
+    ctx.fillStyle = f.stripes;
+    for (let yy = -38; yy < 6; yy += 8.5) ctx.fillRect(-20, yy, 46, 4.2);
+    ctx.fillStyle = f.jacket;
+    ctx.fillRect(-20, -46, 15, 52);
+    ctx.fillRect(10.5, -46, 16, 52);
+    ctx.fillStyle = INK;
+    ctx.fillRect(-5.6, -46, 1.6, 52);
+    ctx.fillRect(10, -46, 1.6, 52);
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    rr(ctx, -16, -30, 9, 8, 1.5); ctx.fill();
+    rr(ctx, -16, -19, 9, 8, 1.5); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(-16, -30, 9, 2); ctx.fillRect(-16, -19, 9, 2);
+  } else if (f.stripes) {
     ctx.fillStyle = f.stripes;
     for (let yy = -38; yy < 6; yy += 8.5) ctx.fillRect(-20, yy, 46, 4.2);
   }
@@ -686,23 +719,21 @@ export function drawPerson(ctx, x, y, sc, o) {
     if (scared) { ctx.moveTo(3, -8.6); ctx.quadraticCurveTo(6.6, -10.4, 9.6, -8.2); ctx.moveTo(10.6, -8); ctx.quadraticCurveTo(13.4, -9.8, 16.2, -7.6); }
     else { ctx.moveTo(2.6, -8.2); ctx.lineTo(9.4, -5.6); ctx.moveTo(10.8, -5.5); ctx.lineTo(16.4, -7.2); }
     ctx.stroke();
-    // mouth hole
+    // mouth opening with a confident smirk
     ctx.fillStyle = INK;
-    ctx.beginPath(); ctx.ellipse(11.6, 10.2, 6.8, scared ? 5.4 : 4.4, 0, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(11.8, 10.4, 5.4, scared ? 4.8 : 3.3, -0.08, 0, TAU); ctx.fill();
     ctx.fillStyle = f.skin;
-    ctx.beginPath(); ctx.ellipse(11.6, 10.2, 5.6, scared ? 4.2 : 3.2, 0, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(11.8, 10.4, 4.3, scared ? 3.7 : 2.3, -0.08, 0, TAU); ctx.fill();
     if (scared) {
       ctx.fillStyle = '#4a1414';
-      ctx.beginPath(); ctx.ellipse(11.6, 10.6, 2.8, 3, 0, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(11.8, 10.8, 2.2, 2.6, 0, 0, TAU); ctx.fill();
     } else {
-      ctx.fillStyle = '#4a1414';
-      ctx.beginPath(); ctx.moveTo(7.4, 9.1); ctx.quadraticCurveTo(11.6, 15, 16, 8.6); ctx.quadraticCurveTo(11.6, 10.8, 7.4, 9.1); ctx.fill();
-      ctx.fillStyle = '#fff';
-      ctx.beginPath(); ctx.moveTo(8.2, 9.4); ctx.quadraticCurveTo(11.6, 11.2, 15.2, 9); ctx.lineTo(15, 10.4); ctx.quadraticCurveTo(11.6, 12.2, 8.4, 10.6); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#4a1414';
+      ctx.lineWidth = 1.5;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(8.8, 10.6); ctx.quadraticCurveTo(12, 12, 15.2, 9.2); ctx.stroke();
       ctx.fillStyle = '#ffcf3a';
-      ctx.fillRect(12.4, 9.9, 1.8, 1.8);
-      ctx.fillStyle = '#fff8d0';
-      ctx.fillRect(12.6, 10, 0.7, 0.7);
+      ctx.beginPath(); ctx.arc(13.4, 10.6, 0.8, 0, TAU); ctx.fill();
     }
   } else {
     if (f.shades) {
@@ -746,6 +777,31 @@ export function drawPerson(ctx, x, y, sc, o) {
   ctx.scale(1.12, 1.12);
   drawHat(ctx, f.hat, t);
   ctx.restore();
+  if (f.headset) {
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 3.6;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-4, 1); ctx.quadraticCurveTo(-6, -14, 2, -21); ctx.stroke();
+    ctx.strokeStyle = '#3a3d48';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 2.6;
+    ctx.beginPath(); ctx.moveTo(-3, 4); ctx.quadraticCurveTo(4, 14, 12.5, 12.5); ctx.stroke();
+    ctx.strokeStyle = '#4a4e5c';
+    ctx.lineWidth = 1.3;
+    ctx.stroke();
+    ctx.fillStyle = INK;
+    ctx.beginPath(); ctx.ellipse(-4, 2, 5.6, 6.4, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#2a2d36';
+    ctx.beginPath(); ctx.ellipse(-4, 2, 4.4, 5.2, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#59e3ff';
+    ctx.beginPath(); ctx.ellipse(-4, 2, 1.6, 2.4, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = INK;
+    ctx.beginPath(); ctx.arc(13, 12.4, 2.2, 0, TAU); ctx.fill();
+    ctx.fillStyle = Math.sin(t * 4) > 0 ? '#ff4d4d' : '#5a1414';
+    ctx.beginPath(); ctx.arc(13, 12.4, 1.1, 0, TAU); ctx.fill();
+  }
   ctx.restore();
 
   // front arm + held item

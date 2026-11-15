@@ -243,6 +243,132 @@ function drawKeypad(ctx, x, y, s, progress, open, time) {
   }
 }
 
+// The hacker's rig: a flight case with a laptop on it. (x, y) = the robber's feet.
+function drawHackRig(ctx, x, y, s, time) {
+  const cx0 = x + 22 * s, cx1 = x + 64 * s, top = y - 70 * s;
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.beginPath(); ctx.ellipse((cx0 + cx1) / 2, y + 1, 26 * s, 4 * s, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = 'rgba(6,8,12,0.95)';
+  rr(ctx, cx0 - 1.5 * s, top - 1.5 * s, cx1 - cx0 + 3 * s, y - top + 1.5 * s, 3 * s); ctx.fill();
+  const g = ctx.createLinearGradient(cx0, 0, cx1, 0);
+  g.addColorStop(0, '#8d97a6'); g.addColorStop(0.45, '#dfe5ec'); g.addColorStop(1, '#7a8494');
+  ctx.fillStyle = g;
+  rr(ctx, cx0, top, cx1 - cx0, y - top, 2.5 * s); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  for (let k = 1; k < 4; k++) ctx.fillRect(cx0, top + (y - top) * k / 4, cx1 - cx0, 1.2 * s);
+  ctx.fillStyle = '#3a3f4a';
+  for (const [px, py] of [[cx0, top], [cx1 - 5 * s, top], [cx0, y - 5 * s], [cx1 - 5 * s, y - 5 * s]]) ctx.fillRect(px, py, 5 * s, 5 * s);
+  ctx.fillStyle = '#f2c14e';
+  rr(ctx, cx0 + 10 * s, top + 22 * s, 14 * s, 10 * s, 1.5 * s); ctx.fill();
+  ctx.fillStyle = '#111';
+  ctx.font = `900 ${Math.round(7 * s)}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('!', cx0 + 17 * s, top + 27.5 * s);
+  // laptop base with a glowing keyboard
+  ctx.fillStyle = 'rgba(6,8,12,0.95)';
+  rr(ctx, x + 19 * s, top - 5.5 * s, 40 * s, 6 * s, 1.5 * s); ctx.fill();
+  ctx.fillStyle = '#2a2e38';
+  rr(ctx, x + 20 * s, top - 4.5 * s, 38 * s, 4 * s, 1.2 * s); ctx.fill();
+  ctx.fillStyle = `rgba(89,227,255,${0.55 + 0.25 * Math.sin(time * 9)})`;
+  ctx.fillRect(x + 23 * s, top - 4.6 * s, 26 * s, 1.2 * s);
+  // lid, tilted back, screen facing the robber
+  const hx = x + 56 * s, hy = top - 5 * s, a = 0.22, L = 30 * s;
+  const ex = hx + Math.sin(a) * L, ey = hy - Math.cos(a) * L;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = 'rgba(6,8,12,0.95)';
+  ctx.lineWidth = 6 * s;
+  ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(ex, ey); ctx.stroke();
+  ctx.strokeStyle = '#3a3e4a';
+  ctx.lineWidth = 3.6 * s;
+  ctx.stroke();
+  ctx.strokeStyle = '#7ff0ff';
+  ctx.lineWidth = 1.4 * s;
+  ctx.beginPath(); ctx.moveTo(hx - 2.2 * s, hy - 2 * s); ctx.lineTo(ex - 2.2 * s, ey + 1 * s); ctx.stroke();
+  // skull sticker on the back of the lid
+  ctx.fillStyle = '#f2efe6';
+  ctx.beginPath(); ctx.arc((hx + ex) / 2 + 1.6 * s, (hy + ey) / 2, 1.8 * s, 0, TAU); ctx.fill();
+  return { portX: hx + 1 * s, portY: hy + 2 * s, screenX: ex - 2 * s, screenY: ey + 3 * s };
+}
+
+// Floating hologram above the laptop: code, progress, access granted.
+function drawHologram(ctx, rig, s, progress, time) {
+  const W = 96 * s, H = 56 * s;
+  const bx = rig.screenX - W * 0.62, by = rig.screenY - H - 26 * s;
+  const flick = 0.82 + 0.18 * Math.sin(time * 31) * Math.sin(time * 7);
+  const done = progress >= 0.97;
+  const col = done ? '89,227,154' : '90,230,255';
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  // projection beam
+  const pg = ctx.createLinearGradient(0, rig.screenY, 0, by + H);
+  pg.addColorStop(0, `rgba(${col},0.28)`);
+  pg.addColorStop(1, `rgba(${col},0.04)`);
+  ctx.fillStyle = pg;
+  ctx.beginPath(); ctx.moveTo(rig.screenX - 2 * s, rig.screenY); ctx.lineTo(bx + W, by + H); ctx.lineTo(bx, by + H); ctx.lineTo(rig.screenX - 6 * s, rig.screenY); ctx.closePath(); ctx.fill();
+  ctx.globalAlpha = flick;
+  ctx.fillStyle = `rgba(${col},0.12)`;
+  ctx.fillRect(bx, by, W, H);
+  ctx.strokeStyle = `rgba(${col},0.8)`;
+  ctx.lineWidth = 1.2 * s;
+  ctx.strokeRect(bx, by, W, H);
+  // corner brackets
+  ctx.lineWidth = 2.2 * s;
+  for (const [cx, cy, dx, dy] of [[bx, by, 1, 1], [bx + W, by, -1, 1], [bx, by + H, 1, -1], [bx + W, by + H, -1, -1]]) {
+    ctx.beginPath(); ctx.moveTo(cx + dx * 7 * s, cy); ctx.lineTo(cx, cy); ctx.lineTo(cx, cy + dy * 7 * s); ctx.stroke();
+  }
+  ctx.fillStyle = `rgba(${col},0.95)`;
+  ctx.font = `700 ${Math.max(7, Math.round(6.5 * s))}px "Chakra Petch", monospace`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('VAULT-OS  //  BREACH', bx + 5 * s, by + 4 * s);
+  // scrolling code
+  for (let i = 0; i < 5; i++) {
+    const n = Math.floor(time * 7) + i;
+    const lw = (0.3 + hash(n, 141) * 0.6) * (W - 10 * s);
+    ctx.fillStyle = `rgba(${col},${0.35 + 0.3 * hash(n, 142)})`;
+    ctx.fillRect(bx + 5 * s + hash(n, 143) * 8 * s, by + 15 * s + i * 5.2 * s, lw, 2.2 * s);
+  }
+  // progress bar
+  const py = by + H - 12 * s;
+  ctx.fillStyle = `rgba(${col},0.18)`;
+  ctx.fillRect(bx + 5 * s, py, W - 30 * s, 6 * s);
+  ctx.fillStyle = `rgba(${col},0.9)`;
+  ctx.fillRect(bx + 5 * s, py, (W - 30 * s) * Math.min(1, progress), 6 * s);
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`${Math.min(100, Math.floor(progress * 100))}%`, bx + W - 23 * s, py + 3 * s);
+  // scan line
+  const sy = by + ((time * 0.8) % 1) * H;
+  ctx.fillStyle = `rgba(${col},0.25)`;
+  ctx.fillRect(bx, sy, W, 1.5 * s);
+  if (done) {
+    ctx.fillStyle = 'rgba(89,227,154,1)';
+    ctx.font = `900 ${Math.max(8, Math.round(9 * s))}px "Chakra Petch", system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText('ACCESS GRANTED', bx + W / 2, by + H * 0.52);
+  }
+  ctx.restore();
+}
+
+// Data cable from the laptop, along the floor and up the wall to the keypad.
+function drawCable(ctx, x1, y1, groundY, wallY, x2, y2, s) {
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  const path = () => {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.quadraticCurveTo(x1 + 10 * s, groundY, x1 + 30 * s, groundY - 2 * s);
+    ctx.quadraticCurveTo((x1 + x2) / 2, groundY - 4 * s, x2 - 18 * s, wallY + 2 * s);
+    ctx.quadraticCurveTo(x2, wallY, x2, y2);
+  };
+  ctx.strokeStyle = 'rgba(6,8,12,0.95)';
+  ctx.lineWidth = 4 * s;
+  path(); ctx.stroke();
+  ctx.strokeStyle = '#2b6cff';
+  ctx.lineWidth = 2.2 * s;
+  path(); ctx.stroke();
+}
+
 // Dark shapes rushing past in front of the camera, for depth.
 function drawForeground(ctx, type, w, h, scroll) {
   const P = w * 1.25;
@@ -452,7 +578,7 @@ export function createVaultScene() {
           }
         }
       }
-      let pose = running ? 'run' : crashed ? 'hands' : 'idle';
+      let pose = running ? 'run' : crashed ? 'hands' : 'type';
       let jumpY = 0;
       if (action) {
         const p = (time - action.t0) / action.dur;
@@ -540,15 +666,20 @@ export function createVaultScene() {
         }
       }
 
-      // betting: the security camera pans and the robber drills the door
+      // betting: the security camera pans and the robber hacks the vault
+      let rig = null;
       if (v.phase === 'betting') {
         drawCamera(ctx, w * 0.1, h * 0.12, h * 0.0024, 0.6 + Math.sin(time * 0.8) * 0.35, time, false);
         drawDoor(ctx, doorBase, doorY, doorR, v.betProgress * TAU * 1.5, v.betProgress, 0, time);
         drawKeypad(ctx, doorBase + doorR * 1.55, doorY - doorR * 0.35, h * 0.0034, v.betProgress, false, time);
+        rig = drawHackRig(ctx, rx, gy, sc, time);
+        drawCable(ctx, rig.portX, rig.portY, gy - 2 * sc, floorY + 3, doorBase + doorR * 1.55, doorY - doorR * 0.35 + 35 * h * 0.0034, sc);
       } else if (running && scroll - scrollAtStart < w * 1.6) {
         const dx0 = doorBase - (scroll - scrollAtStart);
         drawDoor(ctx, dx0, doorY, doorR, 1.5 * TAU, 1, easeOut((time - launchTime) / 0.5) * 1.5, time);
         drawKeypad(ctx, dx0 + doorR * 1.55, doorY - doorR * 0.35, h * 0.0034, 1, true, time);
+        const rg = drawHackRig(ctx, rx - (scroll - scrollAtStart), gy, sc, time);
+        drawCable(ctx, rg.portX, rg.portY, gy - 2 * sc, floorY + 3, dx0 + doorR * 1.55, doorY - doorR * 0.35 + 35 * h * 0.0034, sc);
       }
 
       const info = { w, h, floorY, gy, rx, time };
@@ -705,7 +836,7 @@ export function createVaultScene() {
       const r = drawPerson(ctx, rx, gy + jumpY, sc, {
         pose, ph, t: time, outfit: OUTFITS.robber,
         bag: crashed ? 0 : bagR,
-        item: v.phase === 'betting' ? 'drill' : null,
+        item: null,
       });
       bagAt = crashed ? null : [r.bagX, r.bagY];
       // caught in the searchlight
@@ -725,42 +856,20 @@ export function createVaultScene() {
         drawCuffs(ctx, r.handX, r.handY, h * 0.018 * easeOutBack(clamp((tcr - 0.55) / 0.25, 0, 1)));
       }
 
-      // headlamp on the beanie lights up the door while he drills
-      if (v.phase === 'betting') {
-        const lx = r.headX + 8 * sc, ly = r.headY - 16 * sc;
-        const tx2 = doorBase - doorR * 0.2, ty2 = doorY + doorR * 0.1;
+      // hacking: hologram above the laptop, screen light on his face, sparks at the keypad
+      if (v.phase === 'betting' && rig) {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        const hg = ctx.createLinearGradient(lx, ly, tx2, ty2);
-        hg.addColorStop(0, 'rgba(255,248,215,0.35)');
-        hg.addColorStop(1, 'rgba(255,248,215,0.04)');
-        ctx.fillStyle = hg;
-        ctx.beginPath(); ctx.moveTo(lx, ly - 2); ctx.lineTo(tx2, ty2 - doorR * 0.55); ctx.lineTo(tx2, ty2 + doorR * 0.55); ctx.lineTo(lx, ly + 2); ctx.closePath(); ctx.fill();
-        const pg = ctx.createRadialGradient(tx2, ty2, 0, tx2, ty2, doorR * 0.6);
-        pg.addColorStop(0, 'rgba(255,248,215,0.22)');
-        pg.addColorStop(1, 'rgba(255,248,215,0)');
-        ctx.fillStyle = pg;
-        ctx.fillRect(tx2 - doorR * 0.6, ty2 - doorR * 0.6, doorR * 1.2, doorR * 1.2);
+        const fg2 = ctx.createRadialGradient(r.headX + 10 * sc, r.headY, 0, r.headX + 10 * sc, r.headY, 40 * sc);
+        fg2.addColorStop(0, 'rgba(90,230,255,0.22)');
+        fg2.addColorStop(1, 'rgba(90,230,255,0)');
+        ctx.fillStyle = fg2;
+        ctx.fillRect(r.headX - 30 * sc, r.headY - 40 * sc, 80 * sc, 80 * sc);
         ctx.restore();
-        ctx.fillStyle = 'rgba(6,8,12,0.9)';
-        ctx.beginPath(); ctx.arc(lx, ly, 4.2 * sc * 1.16, 0, TAU); ctx.fill();
-        ctx.fillStyle = '#fffbe0';
-        ctx.beginPath(); ctx.arc(lx + 0.6 * sc, ly, 2.8 * sc * 1.16, 0, TAU); ctx.fill();
-      }
-
-      // drill sparks during the countdown
-      if (v.phase === 'betting') {
-        const tipX = r.handX + 36 * sc, tipY = r.handY - 4 * sc;
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
-        const dg = ctx.createRadialGradient(tipX, tipY, 0, tipX, tipY, h * 0.06);
-        dg.addColorStop(0, `rgba(255,220,140,${0.5 + Math.random() * 0.3})`);
-        dg.addColorStop(1, 'rgba(255,180,80,0)');
-        ctx.fillStyle = dg;
-        ctx.fillRect(tipX - h * 0.06, tipY - h * 0.06, h * 0.12, h * 0.12);
-        ctx.restore();
-        for (let k = 0; k < (reduced ? 1 : 3); k++) {
-          if (Math.random() < 0.8) fx.add({ kind: 'spark', x: tipX, y: tipY, vx: -w * (0.05 + Math.random() * 0.2), vy: -h * (Math.random() * 0.6), g: h * 2.2, life: 0.35 + Math.random() * 0.25 });
+        drawHologram(ctx, rig, sc, v.betProgress, time);
+        if (!reduced && Math.random() < 0.25) {
+          const kx = doorBase + doorR * 1.55, ky = doorY - doorR * 0.35 + 35 * h * 0.0034;
+          for (let k = 0; k < 3; k++) fx.add({ kind: 'spark', x: kx, y: ky, vx: (Math.random() - 0.5) * h * 0.5, vy: -h * Math.random() * 0.4, g: h * 2, life: 0.25 });
         }
       }
 

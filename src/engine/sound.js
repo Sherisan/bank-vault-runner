@@ -232,6 +232,9 @@ export const music = (() => {
       if (step === 0 || step === 8) bass(t, ch.root, s16 * 3);
       if (step === 0) pad(t, ch.chord, s16 * 16);
       if (step === 14) hat(t, true);
+      // keyboard clatter and data blips while he hacks
+      if (!muted && Math.random() < 0.75) hiss(t + Math.random() * s16 * 0.8, { dur: 0.025, gain: 0.05 + Math.random() * 0.04, type: 'highpass', freq: 3500 + Math.random() * 2500 });
+      if (!muted && step % 4 === 2 && Math.random() < 0.6) voice(t, { type: 'square', freq: 1600 + Math.floor(Math.random() * 4) * 400, dur: 0.04, gain: 0.018, filter: { freq: 4000 } });
     } else if (mode === 'running') {
       const lvl = mult >= 8 ? 4 : mult >= 3.2 ? 3 : mult >= 1.6 ? 2 : 1;
       if ([0, 7, 8, 10].includes(step)) kick(t);
@@ -322,7 +325,7 @@ export const music = (() => {
 
   function apply(prev) {
     if (!ctx || ctx.state !== 'running') return;
-    if (mode === 'betting') startDrill(); else { stopLoop(drill); drill = null; }
+    stopLoop(drill); drill = null;
     if (mode === 'running' && mult >= 3.2) startSiren();
     if (mode !== 'running') { stopLoop(siren); siren = null; }
     if (mode === 'running' && prev !== 'running') { step = 0; bar = 0; nextTime = ctx.currentTime + 0.05; }
