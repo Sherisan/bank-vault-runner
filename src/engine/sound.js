@@ -166,6 +166,20 @@ export const sfx = {
     voice(t, { type: 'square', freq: 1320, dur: 0.07, gain: 0.03, filter: { freq: 5000 } });
     voice(t + 0.06, { type: 'square', freq: 1976, dur: 0.14, gain: 0.03, filter: { freq: 6000 } });
   },
+  bark() {
+    if (!live()) return;
+    const t = now();
+    [0, 0.16].forEach((d) => {
+      hiss(t + d, { dur: 0.12, gain: 0.22, type: 'bandpass', freq: 750, q: 2.5 });
+      voice(t + d, { type: 'sawtooth', freq: 420, to: 190, dur: 0.12, gain: 0.08, filter: { freq: 1400 } });
+    });
+  },
+  zap() {
+    if (!live()) return;
+    const t = now();
+    voice(t, { type: 'square', freq: 60, dur: 0.8, gain: 0.08, filter: { freq: 900 } });
+    for (let i = 0; i < 10; i++) hiss(t + i * 0.07, { dur: 0.05, gain: 0.12, type: 'highpass', freq: 2500 + Math.random() * 3000 });
+  },
   cuffs() {
     if (!live()) return;
     const t = now();

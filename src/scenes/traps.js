@@ -61,12 +61,30 @@ export function drawTrap(ctx, tr, x, info) {
   const lw = Math.max(2, h * 0.006);
   const s = h * 0.0028; // object scale, matches the characters
 
+  if (!tr.hit && x > rx - 10) {
+    const p = 0.5 + 0.5 * Math.sin(time * 7 + tr.x * 0.01);
+    const zapCol = tr.type === 'plate' ? '90,200,255' : '255,60,60';
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const dg = ctx.createRadialGradient(x, gy, 0, x, gy, h * 0.16);
+    dg.addColorStop(0, 'rgba(' + zapCol + ',' + (0.18 + 0.14 * p) + ')');
+    dg.addColorStop(1, 'rgba(' + zapCol + ',0)');
+    ctx.fillStyle = dg;
+    ctx.beginPath(); ctx.ellipse(x, gy, h * 0.16, h * 0.045, 0, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
   switch (tr.type) {
     case 'laserLow':
     case 'laserHigh': {
       const H = tr.type === 'laserLow' ? h * 0.07 : h * 0.21;
       emitter(ctx, xB, yB, H * kB + 10, kB);
       laserBeam(ctx, xB, yB - H * kB, xF, yF - H * kF, lw, time, tr.x);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = 'rgba(255,40,80,0.35)';
+      ctx.lineWidth = lw * 3;
+      ctx.beginPath(); ctx.moveTo(xB, yB); ctx.lineTo(xF, yF); ctx.stroke();
+      ctx.restore();
       emitter(ctx, xF, yF, H * kF + 10, kF);
       break;
     }
@@ -100,6 +118,46 @@ export function drawTrap(ctx, tr, x, info) {
           ctx.lineTo(px, py);
         }
         ctx.stroke();
+      }
+      ctx.restore();
+      const coil = (px, py, k) => {
+        const H2 = h * 0.12 * k;
+        ctx.fillStyle = 'rgba(6,8,12,0.9)';
+        rr(ctx, px - 6 * k, py - H2, 12 * k, H2, 3); ctx.fill();
+        for (let i = 0; i < 5; i++) {
+          ctx.fillStyle = i % 2 ? '#c98a3a' : '#e8b24a';
+          ctx.fillRect(px - 4.5 * k, py - H2 + 4 * k + i * (H2 - 8 * k) / 5, 9 * k, (H2 - 8 * k) / 5 - 1);
+        }
+        ctx.fillStyle = 'rgba(6,8,12,0.9)';
+        ctx.beginPath(); ctx.arc(px, py - H2 - 3 * k, 7 * k, 0, TAU); ctx.fill();
+        const cg = ctx.createRadialGradient(px - 2 * k, py - H2 - 5 * k, 1, px, py - H2 - 3 * k, 6 * k);
+        cg.addColorStop(0, '#f2f6fa'); cg.addColorStop(1, '#7a8494');
+        ctx.fillStyle = cg;
+        ctx.beginPath(); ctx.arc(px, py - H2 - 3 * k, 5.8 * k, 0, TAU); ctx.fill();
+        return [px, py - H2 - 3 * k];
+      };
+      const t1 = coil(xB, yB, kB), t2 = coil(xF, yF, kF);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (let b = 0; b < 2; b++) {
+        const seed = Math.floor(time * 24) + b * 31;
+        ctx.strokeStyle = b ? 'rgba(200,240,255,0.95)' : 'rgba(110,200,255,0.75)';
+        ctx.lineWidth = b ? 1.6 : 3.5;
+        ctx.beginPath();
+        ctx.moveTo(t1[0], t1[1]);
+        for (let k = 1; k < 8; k++) {
+          const u = k / 8;
+          ctx.lineTo(lerp(t1[0], t2[0], u) + Math.sin(seed * 1.7 + k * 5.3) * 8, lerp(t1[1], t2[1], u) + Math.cos(seed * 2.3 + k * 3.1) * 8 - Math.sin(u * Math.PI) * h * 0.03);
+        }
+        ctx.lineTo(t2[0], t2[1]);
+        ctx.stroke();
+      }
+      for (const [gx, gy2] of [t1, t2]) {
+        const gl = ctx.createRadialGradient(gx, gy2, 0, gx, gy2, h * 0.05);
+        gl.addColorStop(0, 'rgba(140,220,255,0.6)');
+        gl.addColorStop(1, 'rgba(140,220,255,0)');
+        ctx.fillStyle = gl;
+        ctx.fillRect(gx - h * 0.05, gy2 - h * 0.05, h * 0.1, h * 0.1);
       }
       ctx.restore();
       break;

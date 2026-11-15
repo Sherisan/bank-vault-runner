@@ -243,58 +243,98 @@ function drawKeypad(ctx, x, y, s, progress, open, time) {
   }
 }
 
-// The hacker's rig: a flight case with a laptop on it. (x, y) = the robber's feet.
-function drawHackRig(ctx, x, y, s, time) {
-  const cx0 = x + 22 * s, cx1 = x + 64 * s, top = y - 70 * s;
+// The hacker's workstation: a rolling cart with a laptop on top and a cracking
+// box on the lower shelf. (x, y) = the robber's feet. The laptop is drawn in a
+// 3/4 view so its screen faces the player.
+function drawHackRig(ctx, x, y, s, time, progress = 0) {
+  const INKC = 'rgba(6,8,12,0.95)';
+  const L = x + 20 * s, R = x + 66 * s, top = y - 64 * s;
   ctx.fillStyle = 'rgba(0,0,0,0.4)';
-  ctx.beginPath(); ctx.ellipse((cx0 + cx1) / 2, y + 1, 26 * s, 4 * s, 0, 0, TAU); ctx.fill();
-  ctx.fillStyle = 'rgba(6,8,12,0.95)';
-  rr(ctx, cx0 - 1.5 * s, top - 1.5 * s, cx1 - cx0 + 3 * s, y - top + 1.5 * s, 3 * s); ctx.fill();
-  const g = ctx.createLinearGradient(cx0, 0, cx1, 0);
-  g.addColorStop(0, '#8d97a6'); g.addColorStop(0.45, '#dfe5ec'); g.addColorStop(1, '#7a8494');
-  ctx.fillStyle = g;
-  rr(ctx, cx0, top, cx1 - cx0, y - top, 2.5 * s); ctx.fill();
-  ctx.fillStyle = 'rgba(0,0,0,0.18)';
-  for (let k = 1; k < 4; k++) ctx.fillRect(cx0, top + (y - top) * k / 4, cx1 - cx0, 1.2 * s);
-  ctx.fillStyle = '#3a3f4a';
-  for (const [px, py] of [[cx0, top], [cx1 - 5 * s, top], [cx0, y - 5 * s], [cx1 - 5 * s, y - 5 * s]]) ctx.fillRect(px, py, 5 * s, 5 * s);
-  ctx.fillStyle = '#f2c14e';
-  rr(ctx, cx0 + 10 * s, top + 22 * s, 14 * s, 10 * s, 1.5 * s); ctx.fill();
-  ctx.fillStyle = '#111';
-  ctx.font = `900 ${Math.round(7 * s)}px system-ui, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('!', cx0 + 17 * s, top + 27.5 * s);
-  // laptop base with a glowing keyboard
-  ctx.fillStyle = 'rgba(6,8,12,0.95)';
-  rr(ctx, x + 19 * s, top - 5.5 * s, 40 * s, 6 * s, 1.5 * s); ctx.fill();
+  ctx.beginPath(); ctx.ellipse((L + R) / 2, y + 1, 30 * s, 4 * s, 0, 0, TAU); ctx.fill();
+  // legs + casters
+  for (const lx of [L + 3 * s, R - 3 * s]) {
+    ctx.fillStyle = INKC;
+    ctx.fillRect(lx - 2 * s, top, 4 * s, y - top - 4 * s);
+    ctx.fillStyle = '#9aa3b2';
+    ctx.fillRect(lx - 1 * s, top, 2 * s, y - top - 4 * s);
+    ctx.fillStyle = INKC;
+    ctx.beginPath(); ctx.arc(lx, y - 3 * s, 3.4 * s, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#3a3f4a';
+    ctx.beginPath(); ctx.arc(lx, y - 3 * s, 2 * s, 0, TAU); ctx.fill();
+  }
+  // lower shelf with the cracking box: blinking LEDs and an antenna
+  ctx.fillStyle = INKC;
+  rr(ctx, L - 1 * s, y - 24 * s, R - L + 2 * s, 4 * s, 1.5 * s); ctx.fill();
+  ctx.fillStyle = INKC;
+  rr(ctx, L + 6 * s, y - 42 * s, 34 * s, 19 * s, 2.5 * s); ctx.fill();
+  const bg = ctx.createLinearGradient(0, y - 41 * s, 0, y - 24 * s);
+  bg.addColorStop(0, '#2c313c'); bg.addColorStop(1, '#151820');
+  ctx.fillStyle = bg;
+  rr(ctx, L + 7 * s, y - 41 * s, 32 * s, 17 * s, 2 * s); ctx.fill();
+  for (let r = 0; r < 2; r++) for (let c = 0; c < 7; c++) {
+    const on = hash(Math.floor(time * 10) + r * 7 + c, 151) > 0.45;
+    ctx.fillStyle = on ? (r ? '#ffb347' : '#59e39a') : '#1d2a22';
+    ctx.fillRect(L + 10 * s + c * 4 * s, y - 37 * s + r * 5 * s, 2.4 * s, 2.4 * s);
+  }
+  ctx.strokeStyle = INKC;
+  ctx.lineWidth = 1.6 * s;
+  ctx.beginPath(); ctx.moveTo(L + 36 * s, y - 41 * s); ctx.lineTo(L + 40 * s, y - 54 * s); ctx.stroke();
+  ctx.fillStyle = Math.sin(time * 8) > 0 ? '#ff4d4d' : '#4a1010';
+  ctx.beginPath(); ctx.arc(L + 40 * s, y - 54 * s, 1.6 * s, 0, TAU); ctx.fill();
+  // top tray
+  ctx.fillStyle = INKC;
+  rr(ctx, L - 2 * s, top - 2 * s, R - L + 4 * s, 6 * s, 2 * s); ctx.fill();
+  ctx.fillStyle = '#c9d1dc';
+  rr(ctx, L - 1 * s, top - 1 * s, R - L + 2 * s, 3.5 * s, 1.5 * s); ctx.fill();
+  // laptop base (3/4 view)
+  const b0 = top - 1 * s;
+  ctx.fillStyle = INKC;
+  ctx.beginPath(); ctx.moveTo(L + 2 * s, b0 + 1 * s); ctx.lineTo(R - 6 * s, b0 + 1 * s); ctx.lineTo(R - 1 * s, b0 - 7 * s); ctx.lineTo(L + 8 * s, b0 - 7 * s); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#3a3f4c';
+  ctx.beginPath(); ctx.moveTo(L + 4 * s, b0); ctx.lineTo(R - 7 * s, b0); ctx.lineTo(R - 3 * s, b0 - 6 * s); ctx.lineTo(L + 9 * s, b0 - 6 * s); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = `rgba(89,227,255,${0.45 + 0.3 * Math.sin(time * 11)})`;
+  for (let k = 0; k < 3; k++) ctx.fillRect(L + 9 * s + k * 1.4 * s, b0 - 5 * s + k * 1.6 * s, 26 * s, 0.9 * s);
+  // screen, facing the player
+  const sL = L + 8 * s, sR = R - 1 * s, sB = b0 - 7 * s, sT = sB - 28 * s, lean = 4 * s;
+  ctx.fillStyle = INKC;
+  ctx.beginPath(); ctx.moveTo(sL - 1.5 * s, sB + 1 * s); ctx.lineTo(sR + 1.5 * s, sB + 1 * s); ctx.lineTo(sR + lean + 1.5 * s, sT - 1.5 * s); ctx.lineTo(sL + lean - 1.5 * s, sT - 1.5 * s); ctx.closePath(); ctx.fill();
   ctx.fillStyle = '#2a2e38';
-  rr(ctx, x + 20 * s, top - 4.5 * s, 38 * s, 4 * s, 1.2 * s); ctx.fill();
-  ctx.fillStyle = `rgba(89,227,255,${0.55 + 0.25 * Math.sin(time * 9)})`;
-  ctx.fillRect(x + 23 * s, top - 4.6 * s, 26 * s, 1.2 * s);
-  // lid, tilted back, screen facing the robber
-  const hx = x + 56 * s, hy = top - 5 * s, a = 0.22, L = 30 * s;
-  const ex = hx + Math.sin(a) * L, ey = hy - Math.cos(a) * L;
-  ctx.lineCap = 'round';
-  ctx.strokeStyle = 'rgba(6,8,12,0.95)';
-  ctx.lineWidth = 6 * s;
-  ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(ex, ey); ctx.stroke();
-  ctx.strokeStyle = '#3a3e4a';
-  ctx.lineWidth = 3.6 * s;
-  ctx.stroke();
-  ctx.strokeStyle = '#7ff0ff';
-  ctx.lineWidth = 1.4 * s;
-  ctx.beginPath(); ctx.moveTo(hx - 2.2 * s, hy - 2 * s); ctx.lineTo(ex - 2.2 * s, ey + 1 * s); ctx.stroke();
-  // skull sticker on the back of the lid
-  ctx.fillStyle = '#f2efe6';
-  ctx.beginPath(); ctx.arc((hx + ex) / 2 + 1.6 * s, (hy + ey) / 2, 1.8 * s, 0, TAU); ctx.fill();
-  return { portX: hx + 1 * s, portY: hy + 2 * s, screenX: ex - 2 * s, screenY: ey + 3 * s };
+  ctx.beginPath(); ctx.moveTo(sL, sB); ctx.lineTo(sR, sB); ctx.lineTo(sR + lean, sT); ctx.lineTo(sL + lean, sT); ctx.closePath(); ctx.fill();
+  // display content
+  const dL = sL + 2.5 * s, dR = sR - 2.5 * s, dB = sB - 2.5 * s, dT = sT + 2.5 * s;
+  ctx.save();
+  ctx.beginPath(); ctx.moveTo(dL, dB); ctx.lineTo(dR, dB); ctx.lineTo(dR + lean, dT); ctx.lineTo(dL + lean, dT); ctx.closePath();
+  ctx.clip();
+  ctx.fillStyle = '#03110c';
+  ctx.fillRect(dL, dT, dR - dL + lean, dB - dT);
+  for (let i = 0; i < 6; i++) {
+    const n = Math.floor(time * 9) + i;
+    const yy = dT + 2 * s + i * 3.2 * s;
+    const xx = dL + 1.5 * s + lean * (1 - (yy - dT) / (dB - dT));
+    ctx.fillStyle = i === 5 ? '#ffb347' : `rgba(89,227,154,${0.5 + 0.4 * hash(n, 152)})`;
+    ctx.fillRect(xx, yy, (0.25 + hash(n, 153) * 0.65) * (dR - dL - 4 * s), 1.6 * s);
+  }
+  ctx.fillStyle = 'rgba(89,227,154,0.25)';
+  ctx.fillRect(dL + 1 * s, dB - 4 * s, dR - dL - 2 * s, 2.2 * s);
+  ctx.fillStyle = '#59e39a';
+  ctx.fillRect(dL + 1 * s, dB - 4 * s, (dR - dL - 2 * s) * Math.min(1, progress), 2.2 * s);
+  ctx.restore();
+  // screen glow
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const gl = ctx.createRadialGradient((sL + sR) / 2, (sT + sB) / 2, 0, (sL + sR) / 2, (sT + sB) / 2, 40 * s);
+  gl.addColorStop(0, 'rgba(89,227,154,0.22)');
+  gl.addColorStop(1, 'rgba(89,227,154,0)');
+  ctx.fillStyle = gl;
+  ctx.fillRect(sL - 40 * s, sT - 40 * s, 120 * s, 100 * s);
+  ctx.restore();
+  return { portX: R + 1 * s, portY: top + 1 * s, screenX: (sL + sR) / 2 + lean, screenY: sT, legX: R - 3 * s };
 }
 
 // Floating hologram above the laptop: code, progress, access granted.
 function drawHologram(ctx, rig, s, progress, time) {
-  const W = 96 * s, H = 56 * s;
-  const bx = rig.screenX - W * 0.62, by = rig.screenY - H - 26 * s;
+  const W = 100 * s, H = 58 * s;
+  const bx = rig.screenX - W * 0.18, by = rig.screenY - H - 30 * s;
   const flick = 0.82 + 0.18 * Math.sin(time * 31) * Math.sin(time * 7);
   const done = progress >= 0.97;
   const col = done ? '89,227,154' : '90,230,255';
@@ -369,6 +409,52 @@ function drawCable(ctx, x1, y1, groundY, wallY, x2, y2, s) {
   path(); ctx.stroke();
 }
 
+const ZAP_TYPES = new Set(['laserLow', 'laserHigh', 'laserGrid', 'plate']);
+
+// Electric arcs crackling around the robber.
+function drawZap(ctx, x, y, s, h) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const g = ctx.createRadialGradient(x, y - 60 * s, 0, x, y - 60 * s, 90 * s);
+  g.addColorStop(0, 'rgba(120,220,255,0.35)');
+  g.addColorStop(1, 'rgba(120,220,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(x - 90 * s, y - 150 * s, 180 * s, 180 * s);
+  for (let a = 0; a < 7; a++) {
+    let px = x + (Math.random() - 0.5) * 50 * s, py = y - Math.random() * 120 * s;
+    ctx.strokeStyle = a % 2 ? 'rgba(200,240,255,0.95)' : 'rgba(110,200,255,0.9)';
+    ctx.lineWidth = Math.max(1.2, 2 * s);
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    for (let k = 0; k < 5; k++) { px += (Math.random() - 0.5) * 26 * s; py += (Math.random() - 0.5) * 26 * s; ctx.lineTo(px, py); }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// Dizzy stars circling his head after a trip.
+function drawStars(ctx, x, y, s, time) {
+  for (let i = 0; i < 3; i++) {
+    const a = time * 5 + (i / 3) * TAU;
+    const sx = x + Math.cos(a) * 18 * s, sy = y + Math.sin(a) * 5 * s;
+    const r = (Math.sin(a) > 0 ? 5 : 3.6) * s;
+    ctx.fillStyle = 'rgba(6,8,12,0.9)';
+    star(ctx, sx, sy, r * 1.35);
+    ctx.fillStyle = '#ffd34d';
+    star(ctx, sx, sy, r);
+  }
+}
+function star(ctx, x, y, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i / 10) * TAU;
+    const rr2 = i % 2 ? r * 0.45 : r;
+    ctx.lineTo(x + Math.cos(a) * rr2, y + Math.sin(a) * rr2);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
 // Dark shapes rushing past in front of the camera, for depth.
 function drawForeground(ctx, type, w, h, scroll) {
   const P = w * 1.25;
@@ -422,30 +508,50 @@ function drawCuffs(ctx, x, y, r) {
 }
 
 function drawNet(ctx, cx, bottom, wNet, hNet) {
+  const dome = () => {
+    ctx.beginPath();
+    ctx.moveTo(cx - wNet / 2, bottom);
+    ctx.bezierCurveTo(cx - wNet / 2, bottom - hNet * 0.75, cx - wNet * 0.28, bottom - hNet, cx, bottom - hNet);
+    ctx.bezierCurveTo(cx + wNet * 0.28, bottom - hNet, cx + wNet / 2, bottom - hNet * 0.75, cx + wNet / 2, bottom);
+    ctx.quadraticCurveTo(cx, bottom + hNet * 0.06, cx - wNet / 2, bottom);
+    ctx.closePath();
+  };
   ctx.save();
-  ctx.strokeStyle = 'rgba(230,220,190,0.9)';
-  ctx.lineWidth = 2;
-  const top = bottom - hNet;
-  const cols = 9, rows = 6;
-  for (let i = 0; i <= cols; i++) {
-    const u = i / cols;
-    const xb = cx - wNet / 2 + u * wNet;
+  ctx.fillStyle = 'rgba(20,16,10,0.12)';
+  dome(); ctx.fill();
+  dome(); ctx.clip();
+  // diamond mesh, bowed to follow the dome
+  ctx.strokeStyle = 'rgba(232,222,190,0.85)';
+  ctx.lineWidth = 1.5;
+  const step = wNet / 9;
+  for (let k = -12; k <= 12; k++) {
     ctx.beginPath();
-    ctx.moveTo(cx + (u - 0.5) * wNet * 0.25, top);
-    ctx.quadraticCurveTo(cx + (u - 0.5) * wNet * 0.9, top + hNet * 0.4, xb, bottom);
+    ctx.moveTo(cx + k * step - hNet, bottom + 4);
+    ctx.quadraticCurveTo(cx + k * step - hNet * 0.4, bottom - hNet * 0.6, cx + k * step + hNet * 0.2, bottom - hNet - 4);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx + k * step + hNet, bottom + 4);
+    ctx.quadraticCurveTo(cx + k * step + hNet * 0.4, bottom - hNet * 0.6, cx + k * step - hNet * 0.2, bottom - hNet - 4);
     ctx.stroke();
   }
-  for (let j = 1; j <= rows; j++) {
-    const v = j / rows;
-    const wv = lerp(wNet * 0.25, wNet, Math.sqrt(v));
-    ctx.beginPath();
-    ctx.moveTo(cx - wv / 2, top + hNet * v);
-    ctx.quadraticCurveTo(cx, top + hNet * v + hNet * 0.05, cx + wv / 2, top + hNet * v);
-    ctx.stroke();
-  }
-  ctx.fillStyle = '#2a2d36';
-  for (const sx of [-1, 1]) { ctx.beginPath(); ctx.arc(cx + sx * wNet / 2, bottom, 5, 0, TAU); ctx.fill(); }
   ctx.restore();
+  // thick rope border, hoist ring and weights
+  ctx.strokeStyle = 'rgba(6,8,12,0.9)';
+  ctx.lineWidth = 5;
+  dome(); ctx.stroke();
+  ctx.strokeStyle = '#d9c99a';
+  ctx.lineWidth = 3;
+  dome(); ctx.stroke();
+  ctx.strokeStyle = '#8a929e';
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(cx, bottom - hNet - 4, 5, 0, TAU); ctx.stroke();
+  for (let i = 0; i <= 6; i++) {
+    const x = cx - wNet / 2 + (i / 6) * wNet;
+    ctx.fillStyle = 'rgba(6,8,12,0.9)';
+    ctx.beginPath(); ctx.arc(x, bottom + 1, 5, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a616e';
+    ctx.beginPath(); ctx.arc(x, bottom + 1, 3.6, 0, TAU); ctx.fill();
+  }
 }
 
 /* ───────── Scene ───────── */
@@ -460,6 +566,7 @@ export function createVaultScene() {
   let shake = 0, flash = 0, banner = null, lastHere = 'vault', rain = 0, slamDone = false;
   let bagAt = null; // where the loot bag was drawn last frame: pickups fly into it
   let heliT0 = 0, heliLock = 0, heliSpot = null, spotted = false, car2 = null, cuffed = false;
+  let dashT = -10, crashCause = 'police', caughtTrap = null;
   const fx = particles();
 
   const zoneAt = (wx) => {
@@ -478,7 +585,7 @@ export function createVaultScene() {
       const sc = h * 0.0026;
       const rx = w * 0.42;
       const doorR = h * 0.21;
-      const doorBase = rx + h * 0.4;
+      const doorBase = rx + h * 0.54;
       const doorY = floorY - doorR * 1.22;
 
       /* phase changes */
@@ -506,6 +613,17 @@ export function createVaultScene() {
         if (v.phase === 'crashed' && lastPhase === 'running') {
           crashTime = time;
           crashZone = zoneAt(scroll + rx);
+          crashCause = Math.random() < 0.5 ? 'trap' : 'police';
+          caughtTrap = null;
+          if (crashCause === 'trap') {
+            const opts = TRAPS[crashZone];
+            const [type] = opts[Math.floor(Math.random() * opts.length)];
+            caughtTrap = { x: scroll + rx + 6, type, action: 'jump', started: true, hit: true };
+            traps.push(caughtTrap);
+            const zap = ZAP_TYPES.has(type);
+            banner = { name: zap ? 'ZAPPED!' : 'TRIPPED A TRAP!', t0: time, red: true };
+            if (zap) sfx.zap?.(); else sfx.slide?.();
+          }
           action = null;
           slamDone = false;
           cuffed = false;
@@ -671,15 +789,15 @@ export function createVaultScene() {
       if (v.phase === 'betting') {
         drawCamera(ctx, w * 0.1, h * 0.12, h * 0.0024, 0.6 + Math.sin(time * 0.8) * 0.35, time, false);
         drawDoor(ctx, doorBase, doorY, doorR, v.betProgress * TAU * 1.5, v.betProgress, 0, time);
-        drawKeypad(ctx, doorBase + doorR * 1.55, doorY - doorR * 0.35, h * 0.0034, v.betProgress, false, time);
-        rig = drawHackRig(ctx, rx, gy, sc, time);
-        drawCable(ctx, rig.portX, rig.portY, gy - 2 * sc, floorY + 3, doorBase + doorR * 1.55, doorY - doorR * 0.35 + 35 * h * 0.0034, sc);
+        drawKeypad(ctx, doorBase + doorR * 1.5, doorY - doorR * 0.15, h * 0.0024, v.betProgress, false, time);
+        rig = drawHackRig(ctx, rx, gy, sc, time, v.betProgress);
+        drawCable(ctx, rig.portX, rig.portY, gy - 2 * sc, floorY + 3, doorBase + doorR * 1.5, doorY - doorR * 0.15 + 37 * h * 0.0024, sc);
       } else if (running && scroll - scrollAtStart < w * 1.6) {
         const dx0 = doorBase - (scroll - scrollAtStart);
         drawDoor(ctx, dx0, doorY, doorR, 1.5 * TAU, 1, easeOut((time - launchTime) / 0.5) * 1.5, time);
-        drawKeypad(ctx, dx0 + doorR * 1.55, doorY - doorR * 0.35, h * 0.0034, 1, true, time);
-        const rg = drawHackRig(ctx, rx - (scroll - scrollAtStart), gy, sc, time);
-        drawCable(ctx, rg.portX, rg.portY, gy - 2 * sc, floorY + 3, dx0 + doorR * 1.55, doorY - doorR * 0.35 + 35 * h * 0.0034, sc);
+        drawKeypad(ctx, dx0 + doorR * 1.5, doorY - doorR * 0.15, h * 0.0024, 1, true, time);
+        const rg = drawHackRig(ctx, rx - (scroll - scrollAtStart), gy, sc, time, 1);
+        drawCable(ctx, rg.portX, rg.portY, gy - 2 * sc, floorY + 3, dx0 + doorR * 1.5, doorY - doorR * 0.15 + 37 * h * 0.0024, sc);
       }
 
       const info = { w, h, floorY, gy, rx, time };
@@ -750,11 +868,30 @@ export function createVaultScene() {
       chasers.forEach((c) => {
         const i = onFoot.indexOf(c);
         let tgt;
-        if (crashed) tgt = c.kind === 'dog' ? 64 * sc : (i === 0 ? 24 : 44 + i * 36) * sc;
-        else if (c.kind === 'dog') tgt = w * (0.1 + 0.12 / Math.sqrt(v.mult));
-        else tgt = w * (0.17 + 0.17 / Math.sqrt(v.mult)) + i * w * 0.085;
+        if (crashed) tgt = c.kind === 'dog' ? -64 * sc : (i === 0 ? 26 : 78 + (i - 1) * 48) * sc;
+        else if (c.kind === 'dog') {
+          tgt = w * (0.2 + 0.08 / Math.sqrt(v.mult));
+          c.bite = 0;
+          if (running && sinceStart > w * 0.6) {
+            if (c.nextLunge === undefined) c.nextLunge = time + 1.2;
+            if (time > c.nextLunge) { c.lunge0 = time; c.nextLunge = time + 3 + Math.random() * 2.5; c.dashed = false; }
+            const L = (time - (c.lunge0 ?? -10)) / 1.0;
+            if (L >= 0 && L < 1) {
+              const k = Math.sin(L * Math.PI);
+              tgt = lerp(tgt, 50 * sc, k);
+              c.bite = k;
+              if (!c.dashed && L > 0.4) {
+                c.dashed = true;
+                dashT = time;
+                sfx.bark?.();
+                for (let q = 0; q < 6; q++) fx.add({ kind: 'dust', x: rx, y: gy, vx: -speed * 0.4 - Math.random() * h * 0.2, vy: -h * Math.random() * 0.12, drag: 3, life: 0.6, r: h * 0.02, scroll: 1 });
+              }
+            }
+          }
+        }
+        else tgt = w * (0.3 + 0.12 / Math.sqrt(v.mult)) + i * w * 0.075;
         if (running && c.kind === 'guard' && sinceStart < w * 0.4) tgt = rx + 120; // a moment after the alarm
-        c.gap = lerp(c.gap, tgt, Math.min(1, dt * (crashed ? 3.5 : 1.1)));
+        c.gap = lerp(c.gap, tgt, Math.min(1, dt * (crashed ? 3.5 : c.kind === 'dog' ? 3 : 1.1)));
         c.ph += dt * (4 + Math.max(speed, crashed ? h * 0.4 : 0) / (h * 0.09)) * (c.kind === 'dog' ? 1.4 : 1);
       });
       if (car) {
@@ -787,10 +924,13 @@ export function createVaultScene() {
         const cy = gy - (c.kind === 'dog' ? -h * 0.025 : i * h * 0.02);
         const csc = sc * (1 - Math.max(0, i) * 0.05);
         if (c.kind === 'dog') {
-          drawDog(ctx, cx, cy, csc * 0.95, { ph: c.ph, t: time, pose: crashed && c.gap < 90 * sc ? 'bark' : 'run' });
+          const facingLeft = crashed && c.gap < 0;
+          if (facingLeft) { ctx.save(); ctx.translate(cx, cy); ctx.scale(-1, 1); drawDog(ctx, 0, 0, csc * 0.95, { ph: c.ph, t: time, pose: Math.abs(c.gap + 64 * sc) < 30 * sc ? 'bark' : 'run' }); ctx.restore(); }
+          else drawDog(ctx, cx, cy, csc * 0.95, { ph: c.ph, t: time, pose: 'run', bite: c.bite || 0 });
           return;
         }
-        const grab = crashed && c.gap < 70 * sc;
+        const grab = crashed && i === 0 && c.gap < 60 * sc;
+        const settled = crashed && !grab && Math.abs(c.gap - (78 + (i - 1) * 48) * sc) < 24 * sc;
         const item = grab ? null : CHASER_ITEM[c.kind];
         if (item === 'flashlight' && v.phase !== 'betting') {
           ctx.save();
@@ -802,7 +942,7 @@ export function createVaultScene() {
           ctx.beginPath(); ctx.moveTo(cx + 34 * csc, cy - 64 * csc); ctx.lineTo(cx + h * 0.5, cy - 120 * csc); ctx.lineTo(cx + h * 0.5, cy + 4); ctx.closePath(); ctx.fill();
           ctx.restore();
         }
-        drawPerson(ctx, cx, cy, csc, { pose: grab ? 'grab' : 'run', ph: c.ph, t: time, outfit: CHASER_OUTFIT[c.kind], item });
+        drawPerson(ctx, cx, cy, csc, { pose: grab ? 'grab' : settled ? 'point' : 'run', ph: c.ph, t: time, outfit: CHASER_OUTFIT[c.kind], item });
       });
 
       // rooftop arrest: SWAT abseils down from the helicopter
@@ -818,7 +958,7 @@ export function createVaultScene() {
 
       /* the robber */
       if (running) bagR = lerp(bagR, 13 + Math.min(14, Math.log(v.mult) * 6), Math.min(1, dt * 3));
-      if (crashed) drawBag(ctx, rx - 46 * sc, gy - bagR * sc * 0.9, bagR * sc, time);
+      if (crashed) drawBag(ctx, rx + 44 * sc, gy - bagR * sc * 0.9, bagR * sc, time);
       // motion streaks behind him at speed
       if (running && speed > w * 0.55 && !reduced) {
         ctx.save();
@@ -832,8 +972,19 @@ export function createVaultScene() {
         }
         ctx.restore();
       }
-      if (crashed && tcr > 0.55) pose = 'kneel';
-      const r = drawPerson(ctx, rx, gy + jumpY, sc, {
+      const dk = (time - dashT) / 0.7;
+      const dashOff = running && dk >= 0 && dk < 1 ? Math.sin(dk * Math.PI) * 34 * sc : 0;
+      const kneelAt = crashCause === 'trap' ? 0.95 : 0.55;
+      const zapped = crashed && crashCause === 'trap' && caughtTrap && ZAP_TYPES.has(caughtTrap.type);
+      let shakeX = 0;
+      if (crashed) {
+        if (tcr > kneelAt) pose = 'kneel';
+        else if (crashCause === 'trap') {
+          if (zapped) { pose = 'hands'; shakeX = (Math.random() - 0.5) * 7 * sc; }
+          else pose = 'slide';
+        }
+      }
+      const r = drawPerson(ctx, rx + dashOff + shakeX, gy + jumpY, sc, {
         pose, ph, t: time, outfit: OUTFITS.robber,
         bag: crashed ? 0 : bagR,
         item: null,
@@ -851,9 +1002,13 @@ export function createVaultScene() {
         ctx.restore();
       }
       // handcuffs snap on
-      if (crashed && tcr > 0.55) {
+      if (crashed && crashCause === 'trap' && tcr < 2.6) {
+        if (zapped && tcr < 1) drawZap(ctx, rx, gy, sc, h);
+        else if (!zapped && tcr > 0.2) drawStars(ctx, r.headX, r.headY - 22 * sc, sc, time);
+      }
+      if (crashed && tcr > kneelAt) {
         if (!cuffed) { cuffed = true; sfx.cuffs?.(); for (let k = 0; k < 8; k++) fx.add({ kind: 'spark', x: r.handX, y: r.handY, vx: (Math.random() - 0.5) * h * 0.6, vy: -h * Math.random() * 0.5, g: h * 2, life: 0.35 }); }
-        drawCuffs(ctx, r.handX, r.handY, h * 0.018 * easeOutBack(clamp((tcr - 0.55) / 0.25, 0, 1)));
+        drawCuffs(ctx, r.handX, r.handY, h * 0.018 * easeOutBack(clamp((tcr - kneelAt) / 0.25, 0, 1)));
       }
 
       // hacking: hologram above the laptop, screen light on his face, sparks at the keypad
@@ -868,7 +1023,7 @@ export function createVaultScene() {
         ctx.restore();
         drawHologram(ctx, rig, sc, v.betProgress, time);
         if (!reduced && Math.random() < 0.25) {
-          const kx = doorBase + doorR * 1.55, ky = doorY - doorR * 0.35 + 35 * h * 0.0034;
+          const kx = doorBase + doorR * 1.5, ky = doorY - doorR * 0.15 + 37 * h * 0.0024;
           for (let k = 0; k < 3; k++) fx.add({ kind: 'spark', x: kx, y: ky, vx: (Math.random() - 0.5) * h * 0.5, vy: -h * Math.random() * 0.4, g: h * 2, life: 0.25 });
         }
       }
@@ -1010,8 +1165,8 @@ export function createVaultScene() {
           const bottom = lerp(heliY + h * 0.05, gy + h * 0.01, e);
           ctx.strokeStyle = 'rgba(230,220,190,0.6)';
           ctx.lineWidth = 1.5;
-          ctx.beginPath(); ctx.moveTo(heliX, heliY + h * 0.05); ctx.lineTo(rx, bottom - h * 0.36); ctx.stroke();
-          drawNet(ctx, rx, bottom, h * 0.42, h * 0.36);
+          ctx.beginPath(); ctx.moveTo(heliX, heliY + h * 0.05); ctx.lineTo(rx, bottom - h * 0.3); ctx.stroke();
+          drawNet(ctx, rx, bottom, h * 0.36, h * 0.3);
           const red = reduced ? true : Math.floor(tc * 2.4) % 2 === 0;
           ctx.fillStyle = red ? 'rgba(255,40,60,0.12)' : 'rgba(60,90,255,0.12)';
           ctx.fillRect(-30, -30, w + 60, h + 60);

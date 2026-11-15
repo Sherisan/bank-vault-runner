@@ -7,31 +7,37 @@ const INK = 'rgba(6,8,12,0.9)';
 export const OUTFITS = {
   robber: {
     skin: '#e8ae80', torso: '#f5eedd', stripes: '#191b27', sleeve: '#1d1f2c', pants: '#2a3050',
-    shoe: '#c0392b', sole: '#f2efe6', laces: '#f2efe6', glove: '#14151c', mask: '#17181f',
+    shoe: '#c0392b', sole: '#f2efe6', laces: '#f2efe6', glove: '#14151c', mask: '#2a2c3d',
     scarf: '#e0413a', collar: '#191b27', belt: '#2b2118', pouches: '#3a3a2a', strap: true,
     jacket: '#1c1f2a', headset: true, cargo: true,
     build: { leg: 20, legW: 14.5, arm: 14.5, armW: 11.5, torso: 1.12, head: 1.16, shoe: 1.18 },
     hat: { type: 'beanie', color: '#1a1b26', pom: '#e04848' },
   },
   police: {
-    skin: '#a8714a', torso: '#24397a', sleeve: '#24397a', pants: '#121a38', shoe: '#08080d', sole: '#2a2c34',
-    glove: '#0d0f18', belt: '#0b0b10', badge: '#f5c84c', radio: true, tie: '#0b1024', epaulette: '#f5c84c', holster: true,
-    hat: { type: 'peaked', color: '#121a38', band: '#e8e2d0', badge: '#f5c84c' },
+    skin: '#a8714a', torso: '#1d2d63', sleeve: '#1d2d63', pants: '#0f152e', shoe: '#08080d', sole: '#2a2c34',
+    glove: '#0b0d14', belt: '#0b0b10', badge: '#f5c84c', radio: true, tie: '#0b1024', epaulette: '#c9a646', holster: true,
+    vest: '#161a24', vestText: 'POLICE', brow: '#1a0f08',
+    build: { leg: 22, legW: 13.5, arm: 16, armW: 11, torso: 1.1, head: 0.96, shoe: 1.08 },
+    hat: { type: 'peaked', color: '#0f152e', band: '#e8e2d0', badge: '#f5c84c' },
   },
   police2: {
-    skin: '#eab993', torso: '#24397a', sleeve: '#24397a', pants: '#121a38', shoe: '#08080d', sole: '#2a2c34',
-    glove: '#0d0f18', belt: '#0b0b10', badge: '#f5c84c', radio: true, mustache: true, shades: true, tie: '#0b1024', epaulette: '#f5c84c', holster: true,
-    hat: { type: 'peaked', color: '#121a38', band: '#e8e2d0', badge: '#f5c84c' },
+    skin: '#e2b48c', torso: '#1d2d63', sleeve: '#1d2d63', pants: '#0f152e', shoe: '#08080d', sole: '#2a2c34',
+    glove: '#0b0d14', belt: '#0b0b10', badge: '#f5c84c', radio: true, shades: true, tie: '#0b1024', epaulette: '#c9a646', holster: true,
+    vest: '#161a24', vestText: 'POLICE', brow: '#2a1a0e',
+    build: { leg: 22, legW: 13.5, arm: 16, armW: 11, torso: 1.12, head: 0.96, shoe: 1.08 },
+    hat: { type: 'peaked', color: '#0f152e', band: '#e8e2d0', badge: '#f5c84c' },
   },
   guard: {
-    skin: '#e2b08a', torso: '#66718a', sleeve: '#66718a', pants: '#2c3343', shoe: '#0a0a10', sole: '#2a2c34',
-    belt: '#111', badge: '#d4dbe4', patch: '#d4dbe4', belly: true, keys: true, mustache: true, brow: '#5a3a20',
-    hat: { type: 'cap', color: '#2c3546' },
+    skin: '#d9a47c', torso: '#3e4656', sleeve: '#3e4656', pants: '#22283a', shoe: '#0a0a10', sole: '#2a2c34',
+    glove: '#111318', belt: '#111', badge: '#d4dbe4', patch: '#d4dbe4', keys: true, vest: '#1b1f27', vestText: 'GUARD', brow: '#3a2414',
+    build: { leg: 22, legW: 14, arm: 16, armW: 11.5, torso: 1.14, head: 0.95, shoe: 1.1 },
+    hat: { type: 'cap', color: '#1b2030' },
   },
   swat: {
-    skin: '#c48b62', torso: '#20252c', vest: '#323a45', vestText: 'SWAT', sleeve: '#262b33', pants: '#1d2127',
-    shoe: '#0a0a0c', sole: '#1a1b1e', glove: '#0d0e10', knee: '#101215', belt: '#0b0b0e', holster: true,
-    hat: { type: 'helmet', color: '#15181d' },
+    skin: '#c48b62', torso: '#1a1d22', vest: '#2a3038', vestText: 'SWAT', sleeve: '#20242b', pants: '#181b20',
+    shoe: '#0a0a0c', sole: '#1a1b1e', glove: '#0b0c0e', knee: '#0e1013', belt: '#0b0b0e', holster: true,
+    build: { leg: 22, legW: 14.5, arm: 16, armW: 12, torso: 1.16, head: 0.95, shoe: 1.12 },
+    hat: { type: 'helmet', color: '#111418' },
   },
 };
 
@@ -327,12 +333,13 @@ function torsoPath(ctx, g, belly) {
 
 function drawScarf(ctx, nx, ny, t, wind, color) {
   for (let k = 1; k >= 0; k--) {
-    const L = 10, pts = [];
+    const L = 12, pts = [];
+    const len = 26 + 34 * wind + k * 6;
     for (let i = 0; i <= L; i++) {
       const u = i / L;
       pts.push([
-        nx - 4 - k * 3 - u * (9 + 44 * wind),
-        ny + 3 + k * 4 + u * (30 - 26 * wind) + Math.sin(t * (5 + 11 * wind) - u * 5 + k * 1.7) * u * (2.5 + 6 * wind),
+        nx - 3 - u * len,
+        ny + 4 + k * 3 + u * (26 - 22 * wind) + Math.sin(t * (5 + 12 * wind) - u * 6 + k * 2) * u * (2 + 5 * wind),
       ]);
     }
     const left = [], right = [];
@@ -341,7 +348,7 @@ function drawScarf(ctx, nx, ny, t, wind, color) {
       let dx = q[0] - o[0], dy = q[1] - o[1];
       const d = Math.hypot(dx, dy) || 1;
       dx /= d; dy /= d;
-      const hw = (4.6 - i * 0.16) * (k ? 0.88 : 1);
+      const hw = 3.2 * (1 - (i / L) * 0.85);
       left.push([p[0] - dy * hw, p[1] + dx * hw]);
       right.push([p[0] + dy * hw, p[1] - dx * hw]);
     }
@@ -351,21 +358,14 @@ function drawScarf(ctx, nx, ny, t, wind, color) {
     for (let i = L; i >= 0; i--) ctx.lineTo(right[i][0], right[i][1]);
     ctx.closePath();
     ctx.lineJoin = 'round';
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 2.6;
     ctx.strokeStyle = INK;
     ctx.stroke();
-    ctx.fillStyle = k ? shade(color, 0.75) : color;
+    const g = ctx.createLinearGradient(pts[0][0], 0, pts[L][0], 0);
+    g.addColorStop(0, k ? shade(color, 0.7) : color);
+    g.addColorStop(1, shade(color, k ? 0.55 : 0.75));
+    ctx.fillStyle = g;
     ctx.fill();
-    // a white band near the end and a frayed fringe
-    const e = pts[L - 2];
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.beginPath(); ctx.arc(e[0], e[1], 2.2, 0, TAU); ctx.fill();
-    ctx.strokeStyle = k ? shade(color, 0.75) : color;
-    ctx.lineWidth = 1.4;
-    for (let f = -1; f <= 1; f++) {
-      const p = pts[L];
-      ctx.beginPath(); ctx.moveTo(p[0], p[1] + f * 2); ctx.lineTo(p[0] - 5, p[1] + f * 3 + Math.sin(t * 12 + f) * 1.5); ctx.stroke();
-    }
   }
 }
 
@@ -403,6 +403,7 @@ export function drawPerson(ctx, x, y, sc, o) {
   if (pose === 'slide') { lean = -1.05; hipY = -10; }
   if (pose === 'ride') { lean = 0.28; hipY = -40; }
   if (pose === 'kneel') { lean = 0.02; hipY = -(B.leg + 4); }
+  if (pose === 'point') { lean = 0.06; }
   if (pose === 'type') { lean = 0.14; bob = Math.sin(t * 2.2) * 0.8; }
   hipY += bob;
   const hipX = 0;
@@ -417,6 +418,7 @@ export function drawPerson(ctx, x, y, sc, o) {
     if (pose === 'slide') return side === 0 ? [1.5, 1.55] : [2.2, 0.9];
     if (pose === 'ride') return side === 0 ? [1.35, 0.15] : [1.2, 0.05];
     if (pose === 'kneel') return side === 0 ? [1.25, -0.05] : [0.12, -1.55];
+    if (pose === 'point') return side === 0 ? [0.3, 0.22] : [-0.3, -0.24];
     return side === 0 ? [0.12, 0.12] : [-0.12, -0.12];
   };
   const drawLeg = (side, color) => {
@@ -473,6 +475,7 @@ export function drawPerson(ctx, x, y, sc, o) {
     if (pose === 'slide') return side === 0 ? [0.5, 1.2] : [-0.4, 0.2];
     if (pose === 'ride') return [1.2, 1.5];
     if (pose === 'kneel') return side === 0 ? [-0.55, -1.5] : [-0.45, -1.4];
+    if (pose === 'point') return side === 0 ? [1.42, 1.56] : [0.25, 0.5];
     if (pose === 'type') {
       const tap = Math.sin(t * 26 + side * 1.9) * 0.07;
       return side === 0 ? [1.0 + tap, 1.72 + tap * 2] : [0.82 - tap, 1.62 - tap * 2];
@@ -748,32 +751,46 @@ export function drawPerson(ctx, x, y, sc, o) {
       ctx.fillStyle = INK;
       ctx.fillRect(-3, -4, 8, 1.6);
     } else {
+      // narrowed, glaring eye under a heavy lid
       ctx.fillStyle = INK;
-      ctx.beginPath(); ctx.ellipse(9.5, -2, 4.2, 3.9, 0, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(9.8, -1.6, 4.4, 3.4, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#f4efe6';
+      ctx.beginPath(); ctx.ellipse(9.8, -1.6, 3.4, 2.4, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#2a1a0e';
+      ctx.beginPath(); ctx.arc(11, -1.2, 1.5, 0, TAU); ctx.fill();
       ctx.fillStyle = '#fff';
-      ctx.beginPath(); ctx.ellipse(9.5, -2, 3.2, 2.9, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#20160e';
-      ctx.beginPath(); ctx.arc(scared ? 9 : 10.5, -1.8, 1.7, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#fff';
-      ctx.beginPath(); ctx.arc(scared ? 9.6 : 11.1, -2.6, 0.6, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(11.5, -1.9, 0.5, 0, TAU); ctx.fill();
+      ctx.fillStyle = shade(f.skin, 0.78);
+      ctx.beginPath(); ctx.moveTo(5.4, -5.2); ctx.lineTo(14.8, -4.6); ctx.lineTo(14.8, -2.4); ctx.lineTo(5.4, -3.6); ctx.closePath(); ctx.fill();
     }
-    // stern brow
-    ctx.strokeStyle = f.brow || '#2a1a10';
-    ctx.lineWidth = 2.8;
-    ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(5, -8.5); ctx.lineTo(13.5, -6); ctx.stroke();
-    // mouth
-    ctx.strokeStyle = '#4a1e12';
-    ctx.lineWidth = 1.8;
-    ctx.beginPath();
-    if (pose === 'grab') { ctx.fillStyle = '#4a1e12'; ctx.ellipse(11, 10, 3, 2.4, 0, 0, TAU); ctx.fill(); }
-    else { ctx.moveTo(7.5, 10.5); ctx.quadraticCurveTo(10.5, 9, 14, 10.5); ctx.stroke(); }
-    ctx.fillStyle = 'rgba(255,110,110,0.2)';
-    ctx.beginPath(); ctx.ellipse(5, 4, 3.4, 2.2, 0, 0, TAU); ctx.fill();
+    // brow shadow and a heavy, angry brow
+    ctx.fillStyle = 'rgba(30,15,5,0.22)';
+    ctx.beginPath(); ctx.ellipse(9.5, -4.2, 7, 2.6, 0.2, 0, TAU); ctx.fill();
+    ctx.fillStyle = f.brow || '#22150c';
+    ctx.beginPath(); ctx.moveTo(3.4, -10.4); ctx.lineTo(15.2, -5.2); ctx.lineTo(14.4, -3.4); ctx.lineTo(3.8, -7.4); ctx.closePath(); ctx.fill();
+    // stubble on the jaw
+    ctx.fillStyle = 'rgba(40,28,22,0.22)';
+    ctx.beginPath(); ctx.ellipse(8.5, 8, 9.5, 5.6, 0.12, 0, TAU); ctx.fill();
+    // mouth: clenched teeth, or shouting when he grabs
+    if (pose === 'grab') {
+      ctx.fillStyle = INK; ctx.beginPath(); ctx.ellipse(11.5, 10, 4.2, 3.6, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#5a1418'; ctx.beginPath(); ctx.ellipse(11.5, 10.3, 3.1, 2.5, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.fillRect(9, 7.5, 5, 1.3);
+    } else {
+      ctx.fillStyle = INK; rr(ctx, 7.2, 8.6, 8.4, 3.8, 1.2); ctx.fill();
+      ctx.fillStyle = '#f2efe6'; rr(ctx, 8, 9.3, 6.8, 2.4, 0.8); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.6;
+      ctx.beginPath();
+      for (const tx of [9.7, 11.4, 13.1]) { ctx.moveTo(tx, 9.3); ctx.lineTo(tx, 11.7); }
+      ctx.moveTo(8, 10.5); ctx.lineTo(14.8, 10.5);
+      ctx.stroke();
+      ctx.strokeStyle = INK; ctx.lineWidth = 1.2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(6.4, 12); ctx.lineTo(7.4, 10.6); ctx.moveTo(15.8, 10.8); ctx.lineTo(16.4, 12.2); ctx.stroke();
+    }
   }
   if (f.mustache) { ctx.save(); ctx.translate(1, 2.5); drawMustache(ctx); ctx.restore(); }
   ctx.save();
-  ctx.translate(0, -1.5);
+  ctx.translate(0, f.hat && f.hat.type === 'beanie' ? -6.5 : -1.5);
   ctx.scale(1.12, 1.12);
   drawHat(ctx, f.hat, t);
   ctx.restore();
@@ -792,11 +809,13 @@ export function drawPerson(ctx, x, y, sc, o) {
     ctx.lineWidth = 1.3;
     ctx.stroke();
     ctx.fillStyle = INK;
-    ctx.beginPath(); ctx.ellipse(-4, 2, 5.6, 6.4, 0, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#2a2d36';
-    ctx.beginPath(); ctx.ellipse(-4, 2, 4.4, 5.2, 0, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#59e3ff';
-    ctx.beginPath(); ctx.ellipse(-4, 2, 1.6, 2.4, 0, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-4, 2, 4.8, 5.6, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#20232c';
+    ctx.beginPath(); ctx.ellipse(-4, 2, 3.6, 4.4, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.beginPath(); ctx.ellipse(-5, 0, 1.6, 2.2, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#59e39a';
+    ctx.beginPath(); ctx.arc(-2, 5.5, 0.8, 0, TAU); ctx.fill();
     ctx.fillStyle = INK;
     ctx.beginPath(); ctx.arc(13, 12.4, 2.2, 0, TAU); ctx.fill();
     ctx.fillStyle = Math.sin(t * 4) > 0 ? '#ff4d4d' : '#5a1414';
@@ -841,7 +860,7 @@ export function drawDog(ctx, x, y, sc, o = {}) {
   const bob = run ? -Math.abs(Math.sin(p)) * 3.5 + 1.5 : Math.sin(t * 3) * 0.6;
   const stretch = run ? 1 + 0.09 * Math.sin(p - 0.6) : 1;
   const fx = 17 * stretch, hx = -17 * stretch;
-  const tan = '#cf8f4c', tanL = '#e8b474', tanD = '#9a6230', black = '#19120d', cream = '#f2d7a8';
+  const tan = '#ad7036', tanL = '#cc9050', tanD = '#734420', black = '#120c08', cream = '#d6b588';
 
   const paw = (pw, col) => {
     ctx.fillStyle = INK;
@@ -961,7 +980,8 @@ export function drawDog(ctx, x, y, sc, o = {}) {
   ctx.fillRect(fx - 4, -44 + bob, 3, 13);
 
   // neck
-  const hx0 = fx + 18, hy0 = -57 + bob * 0.6 + (run ? Math.sin(p * 2) * 1.1 : 0);
+  const biteK = o.bite || 0;
+  const hx0 = fx + 18 + biteK * 7, hy0 = -57 + bob * 0.6 + (run ? Math.sin(p * 2) * 1.1 : 0) + biteK * 3;
   const neck = () => {
     ctx.beginPath();
     ctx.moveTo(fx - 2, -46 + bob);
@@ -1026,7 +1046,7 @@ export function drawDog(ctx, x, y, sc, o = {}) {
   ctx.fillStyle = black;
   ctx.beginPath(); ctx.ellipse(hx2 - 1, hy2 - 6, 8.5, 4, -0.15, 0, TAU); ctx.fill();
   // muzzle (black mask)
-  const open = run || bark ? (bark ? 4.5 : 2.5) : 0.6;
+  const open = (run || bark ? (bark ? 5.5 : 3.4) : 1) + (o.bite || 0) * 5 * (0.6 + 0.4 * Math.abs(Math.sin(t * 22)));
   const muz = () => {
     ctx.beginPath();
     ctx.moveTo(hx2 + 4, hy2 - 6);
@@ -1043,23 +1063,26 @@ export function drawDog(ctx, x, y, sc, o = {}) {
   mz.addColorStop(0, '#5a3a20'); mz.addColorStop(0.45, '#241812'); mz.addColorStop(1, '#0c0806');
   ctx.fillStyle = mz;
   ctx.fill();
-  // lower jaw, teeth and tongue
+  // snarl: lips pulled back, fangs bared, drool
   ctx.fillStyle = INK;
-  ctx.beginPath(); ctx.moveTo(hx2 + 6, hy2 + 5); ctx.lineTo(hx2 + 22, hy2 + 4.5); ctx.quadraticCurveTo(hx2 + 21, hy2 + 7 + open, hx2 + 17, hy2 + 7.5 + open); ctx.lineTo(hx2 + 7, hy2 + 8 + open * 0.6); ctx.closePath(); ctx.fill();
-  if (open > 1) {
-    ctx.fillStyle = '#5a1418';
-    ctx.beginPath(); ctx.moveTo(hx2 + 8, hy2 + 5.6); ctx.lineTo(hx2 + 20.5, hy2 + 5.2); ctx.quadraticCurveTo(hx2 + 19.5, hy2 + 6 + open, hx2 + 16, hy2 + 6.5 + open); ctx.lineTo(hx2 + 8.5, hy2 + 7 + open * 0.5); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#fff';
-    for (const tx3 of [12, 16, 19.5]) { ctx.beginPath(); ctx.moveTo(tx3 + hx2, hy2 + 5.2); ctx.lineTo(tx3 + hx2 + 1, hy2 + 7.2); ctx.lineTo(tx3 + hx2 + 2, hy2 + 5.2); ctx.closePath(); ctx.fill(); }
-    const flap = Math.sin(t * 16) * 1.4;
-    ctx.fillStyle = INK;
-    ctx.beginPath(); ctx.ellipse(hx2 + 13, hy2 + 11 + open * 0.6 + flap, 3.8, 5.8, 0.3, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#f07a90';
-    ctx.beginPath(); ctx.ellipse(hx2 + 13, hy2 + 11 + open * 0.6 + flap, 2.8, 4.8, 0.3, 0, TAU); ctx.fill();
-    ctx.strokeStyle = 'rgba(160,40,60,0.6)';
-    ctx.lineWidth = 0.8;
-    ctx.beginPath(); ctx.moveTo(hx2 + 13, hy2 + 8 + open * 0.6 + flap); ctx.lineTo(hx2 + 13.6, hy2 + 13 + open * 0.6 + flap); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(hx2 + 6, hy2 + 4.5); ctx.lineTo(hx2 + 22.5, hy2 + 4); ctx.quadraticCurveTo(hx2 + 21.5, hy2 + 7.5 + open, hx2 + 17, hy2 + 8 + open); ctx.lineTo(hx2 + 7, hy2 + 8.5 + open * 0.6); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#3e0c0e';
+  ctx.beginPath(); ctx.moveTo(hx2 + 8, hy2 + 5.4); ctx.lineTo(hx2 + 21, hy2 + 5); ctx.quadraticCurveTo(hx2 + 20, hy2 + 6.5 + open, hx2 + 16.5, hy2 + 7 + open); ctx.lineTo(hx2 + 8.5, hy2 + 7.4 + open * 0.5); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#b8434e';
+  ctx.fillRect(hx2 + 9, hy2 + 4.2, 12, 1.5);
+  ctx.fillStyle = '#fbf7ea';
+  for (let i = 0; i < 5; i++) { const tx = hx2 + 10.5 + i * 1.9; ctx.beginPath(); ctx.moveTo(tx, hy2 + 5.6); ctx.lineTo(tx + 0.9, hy2 + 6.9); ctx.lineTo(tx + 1.8, hy2 + 5.6); ctx.fill(); }
+  for (const fx2 of [8.6, 19.4]) { ctx.beginPath(); ctx.moveTo(hx2 + fx2, hy2 + 5.3); ctx.lineTo(hx2 + fx2 + 1.1, hy2 + 9.6); ctx.lineTo(hx2 + fx2 + 2.3, hy2 + 5.3); ctx.closePath(); ctx.fill(); }
+  for (const fx2 of [10.5, 17]) { ctx.beginPath(); ctx.moveTo(hx2 + fx2, hy2 + 7.2 + open * 0.8); ctx.lineTo(hx2 + fx2 + 1, hy2 + 4.6 + open * 0.5); ctx.lineTo(hx2 + fx2 + 2, hy2 + 7.2 + open * 0.8); ctx.closePath(); ctx.fill(); }
+  if (run || bark) {
+    const dr = (t * 1.4) % 1;
+    ctx.fillStyle = 'rgba(220,235,255,0.7)';
+    ctx.beginPath(); ctx.ellipse(hx2 + 14, hy2 + 9 + open + dr * 7, 0.9, 1.6 + dr * 2.2, 0, 0, TAU); ctx.fill();
   }
+  // snout wrinkles
+  ctx.strokeStyle = 'rgba(0,0,0,0.65)';
+  ctx.lineWidth = 0.9;
+  for (const wx of [12.5, 15.5, 18.5]) { ctx.beginPath(); ctx.moveTo(hx2 + wx, hy2 - 4); ctx.quadraticCurveTo(hx2 + wx + 1.6, hy2 - 2.4, hx2 + wx + 0.5, hy2 - 0.6); ctx.stroke(); }
   // nose
   ctx.fillStyle = '#050505';
   ctx.beginPath(); ctx.ellipse(hx2 + 25, hy2 + 0.2, 3.8, 3.1, 0, 0, TAU); ctx.fill();
@@ -1068,15 +1091,14 @@ export function drawDog(ctx, x, y, sc, o = {}) {
   // amber eye with a brow ridge
   ctx.fillStyle = INK;
   ctx.beginPath(); ctx.ellipse(hx2 + 5.5, hy2 - 2.2, 3.6, 2.8, -0.2, 0, TAU); ctx.fill();
-  ctx.fillStyle = '#e8a83a';
+  ctx.fillStyle = '#ffb21e';
   ctx.beginPath(); ctx.ellipse(hx2 + 5.5, hy2 - 2.2, 2.7, 2, -0.2, 0, TAU); ctx.fill();
   ctx.fillStyle = '#120a04';
   ctx.beginPath(); ctx.arc(hx2 + 6.2, hy2 - 2.1, 1.25, 0, TAU); ctx.fill();
   ctx.fillStyle = '#fff';
   ctx.beginPath(); ctx.arc(hx2 + 6.7, hy2 - 2.8, 0.6, 0, TAU); ctx.fill();
-  ctx.strokeStyle = tanL;
-  ctx.lineWidth = 1.6;
-  ctx.beginPath(); ctx.moveTo(hx2 + 2, hy2 - 6.2); ctx.lineTo(hx2 + 8.5, hy2 - 4.8); ctx.stroke();
+  ctx.fillStyle = black;
+  ctx.beginPath(); ctx.moveTo(hx2 + 0.5, hy2 - 7.8); ctx.lineTo(hx2 + 10.2, hy2 - 3.4); ctx.lineTo(hx2 + 9.4, hy2 - 1.9); ctx.lineTo(hx2 + 1.2, hy2 - 5.2); ctx.closePath(); ctx.fill();
   // bark lines
   if (bark && Math.floor(t * 6) % 2 === 0) {
     ctx.strokeStyle = 'rgba(255,255,255,0.85)';
