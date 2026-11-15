@@ -507,51 +507,52 @@ function drawCuffs(ctx, x, y, r) {
   ctx.restore();
 }
 
-function drawNet(ctx, cx, bottom, wNet, hNet) {
-  const dome = () => {
+function drawNet(ctx, cx, bottom, W, H) {
+  // knotted rope mesh, gathered at a steel ring on top, weighted along the bottom
+  const rows = 7, cols = 10;
+  const P = (u, v) => {
+    const wv = W * (0.1 + 0.9 * Math.pow(Math.sin(v * Math.PI / 2), 0.75));
+    return [cx + (u - 0.5) * wv, bottom - H + v * H + Math.sin(u * Math.PI) * v * H * 0.06];
+  };
+  const line = (pts, width, color) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
     ctx.beginPath();
-    ctx.moveTo(cx - wNet / 2, bottom);
-    ctx.bezierCurveTo(cx - wNet / 2, bottom - hNet * 0.75, cx - wNet * 0.28, bottom - hNet, cx, bottom - hNet);
-    ctx.bezierCurveTo(cx + wNet * 0.28, bottom - hNet, cx + wNet / 2, bottom - hNet * 0.75, cx + wNet / 2, bottom);
-    ctx.quadraticCurveTo(cx, bottom + hNet * 0.06, cx - wNet / 2, bottom);
-    ctx.closePath();
+    pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.stroke();
   };
   ctx.save();
-  ctx.fillStyle = 'rgba(20,16,10,0.12)';
-  dome(); ctx.fill();
-  dome(); ctx.clip();
-  // diamond mesh, bowed to follow the dome
-  ctx.strokeStyle = 'rgba(232,222,190,0.85)';
-  ctx.lineWidth = 1.5;
-  const step = wNet / 9;
-  for (let k = -12; k <= 12; k++) {
-    ctx.beginPath();
-    ctx.moveTo(cx + k * step - hNet, bottom + 4);
-    ctx.quadraticCurveTo(cx + k * step - hNet * 0.4, bottom - hNet * 0.6, cx + k * step + hNet * 0.2, bottom - hNet - 4);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(cx + k * step + hNet, bottom + 4);
-    ctx.quadraticCurveTo(cx + k * step + hNet * 0.4, bottom - hNet * 0.6, cx + k * step - hNet * 0.2, bottom - hNet - 4);
-    ctx.stroke();
-  }
-  ctx.restore();
-  // thick rope border, hoist ring and weights
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  const verts = [], horiz = [];
+  for (let c = 0; c <= cols; c++) { const pts = []; for (let r = 0; r <= rows; r++) pts.push(P(c / cols, r / rows)); verts.push(pts); }
+  for (let r = 1; r <= rows; r++) { const pts = []; for (let c = 0; c <= cols; c++) pts.push(P(c / cols, r / rows)); horiz.push(pts); }
+  for (const pts of [...verts, ...horiz]) line(pts, 3.6, 'rgba(6,8,12,0.85)');
+  for (const pts of [...verts, ...horiz]) line(pts, 2, '#d8c79a');
+  // knots
+  ctx.fillStyle = '#8a7444';
+  for (let r = 1; r <= rows; r++) for (let c = 0; c <= cols; c++) { const [x, y] = P(c / cols, r / rows); ctx.beginPath(); ctx.arc(x, y, 1.9, 0, TAU); ctx.fill(); }
+  // heavier rim rope
+  line(horiz[rows - 1], 5, 'rgba(6,8,12,0.9)');
+  line(horiz[rows - 1], 3.2, '#e6d6a6');
+  // ring and weights
+  const [rx0, ry0] = P(0.5, 0);
   ctx.strokeStyle = 'rgba(6,8,12,0.9)';
   ctx.lineWidth = 5;
-  dome(); ctx.stroke();
-  ctx.strokeStyle = '#d9c99a';
-  ctx.lineWidth = 3;
-  dome(); ctx.stroke();
-  ctx.strokeStyle = '#8a929e';
-  ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.arc(cx, bottom - hNet - 4, 5, 0, TAU); ctx.stroke();
-  for (let i = 0; i <= 6; i++) {
-    const x = cx - wNet / 2 + (i / 6) * wNet;
+  ctx.beginPath(); ctx.arc(rx0, ry0 - 4, 5.5, 0, TAU); ctx.stroke();
+  ctx.strokeStyle = '#a9b3c2';
+  ctx.lineWidth = 2.8;
+  ctx.stroke();
+  for (let c = 0; c <= cols; c += 2) {
+    const [x, y] = P(c / cols, 1);
     ctx.fillStyle = 'rgba(6,8,12,0.9)';
-    ctx.beginPath(); ctx.arc(x, bottom + 1, 5, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#5a616e';
-    ctx.beginPath(); ctx.arc(x, bottom + 1, 3.6, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y + 2, 5, 0, TAU); ctx.fill();
+    const g = ctx.createRadialGradient(x - 1.5, y, 0.5, x, y + 2, 4);
+    g.addColorStop(0, '#9aa3b2'); g.addColorStop(1, '#3a404c');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y + 2, 3.8, 0, TAU); ctx.fill();
   }
+  ctx.restore();
 }
 
 /* ───────── Scene ───────── */
@@ -874,7 +875,8 @@ export function createVaultScene() {
           c.bite = 0;
           if (running && sinceStart > w * 0.6) {
             if (c.nextLunge === undefined) c.nextLunge = time + 1.2;
-            if (time > c.nextLunge) { c.lunge0 = time; c.nextLunge = time + 3 + Math.random() * 2.5; c.dashed = false; }
+            if (action) { c.lunge0 = -10; if (time > c.nextLunge - 0.8) c.nextLunge = time + 0.8; }
+            else if (time > c.nextLunge) { c.lunge0 = time; c.nextLunge = time + 3 + Math.random() * 2.5; c.dashed = false; }
             const L = (time - (c.lunge0 ?? -10)) / 1.0;
             if (L >= 0 && L < 1) {
               const k = Math.sin(L * Math.PI);
@@ -916,13 +918,14 @@ export function createVaultScene() {
       }
 
       // draw chasers, far ones first
-      const order = [...chasers].sort((a, b) => b.gap - a.gap);
+      const order = crashed ? [...chasers].sort((a, b) => { const da = a.kind === 'dog' ? 9 : [0, -0.045, 0.03, -0.02][onFoot.indexOf(a) % 4]; const db = b.kind === 'dog' ? 9 : [0, -0.045, 0.03, -0.02][onFoot.indexOf(b) % 4]; return da - db; }) : [...chasers].sort((a, b) => b.gap - a.gap);
       order.forEach((c) => {
         const cx = rx - c.gap;
         if (cx < -h * 0.35) return;
         const i = onFoot.indexOf(c);
-        const cy = gy - (c.kind === 'dog' ? -h * 0.025 : i * h * 0.02);
-        const csc = sc * (1 - Math.max(0, i) * 0.05);
+        const depth = crashed && c.kind !== 'dog' ? [0, -0.045, 0.03, -0.02][i % 4] : -i * 0.02;
+        const cy = gy - (c.kind === 'dog' ? -h * 0.025 : -depth * h);
+        const csc = sc * (crashed && c.kind !== 'dog' ? 1 + depth * 2.2 : 1 - Math.max(0, i) * 0.05);
         if (c.kind === 'dog') {
           const facingLeft = crashed && c.gap < 0;
           if (facingLeft) { ctx.save(); ctx.translate(cx, cy); ctx.scale(-1, 1); drawDog(ctx, 0, 0, csc * 0.95, { ph: c.ph, t: time, pose: Math.abs(c.gap + 64 * sc) < 30 * sc ? 'bark' : 'run' }); ctx.restore(); }
@@ -984,7 +987,7 @@ export function createVaultScene() {
           else pose = 'slide';
         }
       }
-      const r = drawPerson(ctx, rx + dashOff + shakeX, gy + jumpY, sc, {
+      const r = drawPerson(ctx, rx + dashOff + shakeX, gy + jumpY, sc * 0.88, {
         pose, ph, t: time, outfit: OUTFITS.robber,
         bag: crashed ? 0 : bagR,
         item: null,
@@ -1160,13 +1163,24 @@ export function createVaultScene() {
           ctx.fillStyle = `rgba(255,40,40,${a})`;
           ctx.fillRect(-30, -30, w + 60, h + 60);
         } else if (crashZone === 'roof') {
-          // the helicopter drops a net
-          const e = reduced ? 1 : easeOutBack(tc / 0.55);
-          const bottom = lerp(heliY + h * 0.05, gy + h * 0.01, e);
-          ctx.strokeStyle = 'rgba(230,220,190,0.6)';
-          ctx.lineWidth = 1.5;
-          ctx.beginPath(); ctx.moveTo(heliX, heliY + h * 0.05); ctx.lineTo(rx, bottom - h * 0.3); ctx.stroke();
-          drawNet(ctx, rx, bottom, h * 0.36, h * 0.3);
+          // the helicopter drops a net: it falls open, lands, then cinches tight
+          const tn = tc - 0.15;
+          const fall = reduced ? 1 : clamp(tn / 0.55, 0, 1);
+          const cinch = reduced ? 1 : clamp((tn - 0.55) / 0.35, 0, 1);
+          const bottom = lerp(heliY + h * 0.2, gy + h * 0.012, fall * fall);
+          const W = lerp(h * 0.6, h * 0.3, easeOutBack(cinch));
+          const H = lerp(h * 0.12, h * 0.24, easeOut(cinch));
+          const sway = (1 - cinch) * Math.sin(time * 9) * h * 0.02;
+          if (tn > 0) {
+            ctx.strokeStyle = 'rgba(6,8,12,0.9)';
+            ctx.lineWidth = 3.5;
+            ctx.beginPath(); ctx.moveTo(heliX + h * 0.02, heliY + h * 0.05); ctx.lineTo(rx + sway, bottom - H - 8); ctx.stroke();
+            ctx.strokeStyle = '#b8a77a';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            drawNet(ctx, rx + sway, bottom, W, H);
+            if (cinch > 0 && cinch < 0.3 && !reduced) shake = Math.max(shake, 0.35);
+          }
           const red = reduced ? true : Math.floor(tc * 2.4) % 2 === 0;
           ctx.fillStyle = red ? 'rgba(255,40,60,0.12)' : 'rgba(60,90,255,0.12)';
           ctx.fillRect(-30, -30, w + 60, h + 60);

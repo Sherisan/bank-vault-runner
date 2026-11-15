@@ -10,7 +10,7 @@ export const OUTFITS = {
     shoe: '#c0392b', sole: '#f2efe6', laces: '#f2efe6', glove: '#14151c', mask: '#2a2c3d',
     scarf: '#e0413a', collar: '#191b27', belt: '#2b2118', pouches: '#3a3a2a', strap: true,
     jacket: '#1c1f2a', headset: true, cargo: true,
-    build: { leg: 20, legW: 14.5, arm: 14.5, armW: 11.5, torso: 1.12, head: 1.16, shoe: 1.18 },
+    build: { leg: 20, legW: 14, arm: 14.5, armW: 11, torso: 1.06, head: 1.06, shoe: 1.12 },
     hat: { type: 'beanie', color: '#1a1b26', pom: '#e04848' },
   },
   police: {
@@ -670,28 +670,80 @@ export function drawPerson(ctx, x, y, sc, o) {
     ctx.moveTo(16 + g, 6);
     ctx.ellipse(5, 6, 11 + g, 8.5 + g, 0.12, 0, TAU);
   };
-  ctx.fillStyle = INK;
-  head(1.6);
-  ctx.fill();
-  const face = f.mask || f.skin;
-  const hg = ctx.createRadialGradient(6, -6, 2, 2, 2, 18);
-  hg.addColorStop(0, f.mask ? '#34364a' : shade(f.skin, 1.15));
-  hg.addColorStop(1, f.mask ? f.mask : shade(f.skin, 0.92));
-  ctx.fillStyle = hg;
-  head(0);
-  ctx.fill();
-  // ear
-  ctx.fillStyle = INK;
-  ctx.beginPath(); ctx.arc(-4, 2, 4.6, 0, TAU); ctx.fill();
-  ctx.fillStyle = f.mask ? '#26283a' : shade(f.skin, 0.86);
-  ctx.beginPath(); ctx.arc(-4, 2, 3.4, 0, TAU); ctx.fill();
-  // nose
-  ctx.fillStyle = INK;
-  ctx.beginPath(); ctx.ellipse(15.5, 2.5, 5, 4.3, 0, 0, TAU); ctx.fill();
-  ctx.fillStyle = f.mask ? '#2a2c3c' : shade(f.skin, 0.95);
-  ctx.beginPath(); ctx.ellipse(15.5, 2.5, 3.8, 3.2, 0, 0, TAU); ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,0.25)';
-  ctx.beginPath(); ctx.arc(16.5, 1.2, 1.1, 0, TAU); ctx.fill();
+  // profile: forehead, brow, nose, lips, chin, jaw
+  const profile = () => {
+    ctx.beginPath();
+    ctx.moveTo(-6, 13);
+    ctx.bezierCurveTo(-15, 8, -16, -10, -6, -14.5);
+    ctx.bezierCurveTo(2, -17.5, 12, -14, 13.5, -7);
+    ctx.quadraticCurveTo(14.6, -4.6, 14.2, -3.2);
+    ctx.quadraticCurveTo(16.5, 0, 18.6, 3.4);
+    ctx.quadraticCurveTo(18.8, 5, 16, 5.2);
+    ctx.quadraticCurveTo(16.8, 6.4, 16.4, 7.6);
+    ctx.lineTo(15.4, 8.4);
+    ctx.quadraticCurveTo(16.4, 9.2, 16, 10.4);
+    ctx.quadraticCurveTo(14.6, 11.2, 15.4, 13.2);
+    ctx.quadraticCurveTo(14.6, 15.8, 9, 15.8);
+    ctx.quadraticCurveTo(3, 15.6, -1, 12.6);
+    ctx.closePath();
+  };
+  if (f.mask) {
+    ctx.fillStyle = INK;
+    head(1.6);
+    ctx.fill();
+    const hg = ctx.createRadialGradient(6, -6, 2, 2, 2, 18);
+    hg.addColorStop(0, '#34364a');
+    hg.addColorStop(1, f.mask);
+    ctx.fillStyle = hg;
+    head(0);
+    ctx.fill();
+    ctx.fillStyle = INK;
+    ctx.beginPath(); ctx.arc(-4, 2, 4.6, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#26283a';
+    ctx.beginPath(); ctx.arc(-4, 2, 3.4, 0, TAU); ctx.fill();
+    ctx.fillStyle = INK;
+    ctx.beginPath(); ctx.ellipse(15.5, 2.5, 5, 4.3, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#2a2c3c';
+    ctx.beginPath(); ctx.ellipse(15.5, 2.5, 3.8, 3.2, 0, 0, TAU); ctx.fill();
+  } else {
+    ctx.save();
+    ctx.translate(2, 0);
+    ctx.scale(1.1, 1.1);
+    ctx.translate(-2, 0);
+    ctx.fillStyle = INK;
+    profile();
+    ctx.fill();
+    ctx.restore();
+    const hg = ctx.createLinearGradient(-12, -10, 16, 10);
+    hg.addColorStop(0, shade(f.skin, 0.82));
+    hg.addColorStop(0.55, f.skin);
+    hg.addColorStop(1, shade(f.skin, 1.12));
+    ctx.fillStyle = hg;
+    profile();
+    ctx.fill();
+    // jaw shadow and cheekbone light
+    ctx.save();
+    profile();
+    ctx.clip();
+    ctx.fillStyle = 'rgba(40,18,8,0.22)';
+    ctx.beginPath(); ctx.ellipse(3, 16, 13, 5, 0.1, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(255,240,220,0.18)';
+    ctx.beginPath(); ctx.ellipse(10, 3, 4, 2.2, -0.3, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(40,28,22,0.22)';
+    ctx.beginPath(); ctx.ellipse(9, 12, 9, 5.5, 0.1, 0, TAU); ctx.fill();
+    ctx.restore();
+    // short hair and sideburn under the hat
+    ctx.fillStyle = f.hair || '#1d140e';
+    ctx.beginPath(); ctx.moveTo(-11, -8); ctx.lineTo(1.5, -8); ctx.lineTo(2, 1.5); ctx.quadraticCurveTo(-5, 0, -11, -8); ctx.fill();
+    // ear
+    ctx.fillStyle = INK;
+    ctx.beginPath(); ctx.ellipse(-1.5, 2.5, 4.6, 5.8, 0.15, 0, TAU); ctx.fill();
+    ctx.fillStyle = shade(f.skin, 0.9);
+    ctx.beginPath(); ctx.ellipse(-1.5, 2.5, 3.4, 4.6, 0.15, 0, TAU); ctx.fill();
+    ctx.strokeStyle = shade(f.skin, 0.65);
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(-1.2, 2.6, 2, -1.2, 1.6); ctx.stroke();
+  }
 
   if (f.mask) {
     // balaclava: wide eye opening, big determined eyes, cocky grin
@@ -741,54 +793,60 @@ export function drawPerson(ctx, x, y, sc, o) {
   } else {
     if (f.shades) {
       ctx.fillStyle = INK;
-      ctx.beginPath(); ctx.moveTo(4, -5); ctx.lineTo(15, -5); ctx.quadraticCurveTo(15, 2, 10, 2); ctx.quadraticCurveTo(4.5, 2, 4, -5); ctx.fill();
-      const sg2 = ctx.createLinearGradient(0, -5, 0, 2);
-      sg2.addColorStop(0, '#3a4a6a'); sg2.addColorStop(1, '#0c0f18');
+      ctx.beginPath(); ctx.moveTo(5, -4.6); ctx.lineTo(15.6, -4.2); ctx.quadraticCurveTo(15.6, 1.6, 11, 1.6); ctx.quadraticCurveTo(5.6, 1.6, 5, -4.6); ctx.fill();
+      const sg2 = ctx.createLinearGradient(0, -4.6, 0, 1.6);
+      sg2.addColorStop(0, '#4a5a7a'); sg2.addColorStop(1, '#0c0f18');
       ctx.fillStyle = sg2;
-      ctx.beginPath(); ctx.moveTo(5.2, -4.2); ctx.lineTo(14, -4.2); ctx.quadraticCurveTo(14, 1, 10, 1); ctx.quadraticCurveTo(5.6, 1, 5.2, -4.2); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.45)';
-      ctx.fillRect(7, -3.6, 3, 1);
+      ctx.beginPath(); ctx.moveTo(6.2, -3.8); ctx.lineTo(14.6, -3.5); ctx.quadraticCurveTo(14.6, 0.8, 11, 0.8); ctx.quadraticCurveTo(6.6, 0.8, 6.2, -3.8); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.fillRect(8, -3.2, 3, 0.9);
       ctx.fillStyle = INK;
-      ctx.fillRect(-3, -4, 8, 1.6);
+      ctx.fillRect(-1, -3.6, 7, 1.4);
     } else {
-      // narrowed, glaring eye under a heavy lid
+      // almond eye with a heavy upper lid
       ctx.fillStyle = INK;
-      ctx.beginPath(); ctx.ellipse(9.8, -1.6, 4.4, 3.4, 0, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(9.8, -1.6, 3.9, 2.8, 0.08, 0, TAU); ctx.fill();
       ctx.fillStyle = '#f4efe6';
-      ctx.beginPath(); ctx.ellipse(9.8, -1.6, 3.4, 2.4, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#2a1a0e';
-      ctx.beginPath(); ctx.arc(11, -1.2, 1.5, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(9.8, -1.6, 3, 1.9, 0.08, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#4a2e16';
+      ctx.beginPath(); ctx.arc(11, -1.4, 1.5, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#0c0805';
+      ctx.beginPath(); ctx.arc(11.2, -1.4, 0.8, 0, TAU); ctx.fill();
       ctx.fillStyle = '#fff';
-      ctx.beginPath(); ctx.arc(11.5, -1.9, 0.5, 0, TAU); ctx.fill();
-      ctx.fillStyle = shade(f.skin, 0.78);
-      ctx.beginPath(); ctx.moveTo(5.4, -5.2); ctx.lineTo(14.8, -4.6); ctx.lineTo(14.8, -2.4); ctx.lineTo(5.4, -3.6); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.arc(11.6, -2, 0.5, 0, TAU); ctx.fill();
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 1.7;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(6, -3); ctx.quadraticCurveTo(10, -4.4, 13.8, -2.4); ctx.stroke();
+      ctx.strokeStyle = 'rgba(60,30,15,0.4)';
+      ctx.lineWidth = 0.9;
+      ctx.beginPath(); ctx.moveTo(7.4, 1.3); ctx.quadraticCurveTo(10, 2.4, 12.8, 1.1); ctx.stroke();
     }
-    // brow shadow and a heavy, angry brow
-    ctx.fillStyle = 'rgba(30,15,5,0.22)';
-    ctx.beginPath(); ctx.ellipse(9.5, -4.2, 7, 2.6, 0.2, 0, TAU); ctx.fill();
+    // heavy, angry brow
     ctx.fillStyle = f.brow || '#22150c';
-    ctx.beginPath(); ctx.moveTo(3.4, -10.4); ctx.lineTo(15.2, -5.2); ctx.lineTo(14.4, -3.4); ctx.lineTo(3.8, -7.4); ctx.closePath(); ctx.fill();
-    // stubble on the jaw
-    ctx.fillStyle = 'rgba(40,28,22,0.22)';
-    ctx.beginPath(); ctx.ellipse(8.5, 8, 9.5, 5.6, 0.12, 0, TAU); ctx.fill();
-    // mouth: clenched teeth, or shouting when he grabs
+    ctx.beginPath(); ctx.moveTo(4.4, -8.2); ctx.quadraticCurveTo(9.4, -9.6, 14.8, -5.2); ctx.lineTo(14.1, -3.8); ctx.quadraticCurveTo(9.2, -6.8, 4.8, -6); ctx.closePath(); ctx.fill();
+    // nostril and smile line
+    ctx.fillStyle = 'rgba(40,20,10,0.6)';
+    ctx.beginPath(); ctx.ellipse(16.2, 4.3, 1.2, 0.7, 0.3, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(60,30,15,0.45)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(13.8, 3.6); ctx.quadraticCurveTo(12.3, 6, 12.9, 8.8); ctx.stroke();
+    // mouth: a hard line, or a shout when he grabs
     if (pose === 'grab') {
-      ctx.fillStyle = INK; ctx.beginPath(); ctx.ellipse(11.5, 10, 4.2, 3.6, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#5a1418'; ctx.beginPath(); ctx.ellipse(11.5, 10.3, 3.1, 2.5, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.fillRect(9, 7.5, 5, 1.3);
+      ctx.fillStyle = INK;
+      ctx.beginPath(); ctx.moveTo(16.4, 7.3); ctx.lineTo(11.2, 7.8); ctx.quadraticCurveTo(10.8, 10.8, 12.6, 11.6); ctx.lineTo(16, 10.9); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#5a1418';
+      ctx.beginPath(); ctx.moveTo(15.4, 8.6); ctx.lineTo(12.2, 8.9); ctx.quadraticCurveTo(12, 10.4, 13, 10.8); ctx.lineTo(15.2, 10.4); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#f2efe6';
+      ctx.fillRect(12.4, 7.9, 3.8, 1.1);
     } else {
-      ctx.fillStyle = INK; rr(ctx, 7.2, 8.6, 8.4, 3.8, 1.2); ctx.fill();
-      ctx.fillStyle = '#f2efe6'; rr(ctx, 8, 9.3, 6.8, 2.4, 0.8); ctx.fill();
-      ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.6;
-      ctx.beginPath();
-      for (const tx of [9.7, 11.4, 13.1]) { ctx.moveTo(tx, 9.3); ctx.lineTo(tx, 11.7); }
-      ctx.moveTo(8, 10.5); ctx.lineTo(14.8, 10.5);
-      ctx.stroke();
-      ctx.strokeStyle = INK; ctx.lineWidth = 1.2; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(6.4, 12); ctx.lineTo(7.4, 10.6); ctx.moveTo(15.8, 10.8); ctx.lineTo(16.4, 12.2); ctx.stroke();
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 1.4;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(15.6, 8.4); ctx.lineTo(11.6, 8.8); ctx.lineTo(10.7, 9.9); ctx.stroke();
     }
   }
-  if (f.mustache) { ctx.save(); ctx.translate(1, 2.5); drawMustache(ctx); ctx.restore(); }
+  if (f.mustache) { ctx.save(); ctx.translate(0.6, 0.6); drawMustache(ctx); ctx.restore(); }
   ctx.save();
   ctx.translate(0, f.hat && f.hat.type === 'beanie' ? -6.5 : -1.5);
   ctx.scale(1.12, 1.12);
