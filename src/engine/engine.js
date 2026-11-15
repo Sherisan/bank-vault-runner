@@ -310,6 +310,7 @@ export function createEngine(id, label) {
         betLeft: st.phase === 'betting' ? Math.max(0, BET_MS / 1000 - tPhase) : 0,
         betProgress: st.phase === 'betting' ? Math.min(1, tPhase / (BET_MS / 1000)) : 0,
         roundId: st.roundId,
+        stake: ['A', 'B'].reduce((sum, k) => sum + (st.bets[k].status === 'live' ? st.bets[k].stake : 0), 0),
       };
     },
     liveStake(slotKey) {

@@ -244,72 +244,152 @@ export function drawItem(ctx, item, t = 0) {
   }
 }
 
-// Loot sack, tied at the top (towards the shoulder).
-export function drawBag(ctx, bx, by, r, t = 0) {
+// Loot sack. o.fill (0..1) = how much money spills out the top; o.tag = text on
+// the paper tag hanging from the tie (the player's bet value while it runs).
+export function drawBag(ctx, bx, by, r, t = 0, o = {}) {
+  const fill = o.fill ?? 0.3;
   ctx.save();
   ctx.translate(bx, by);
-  ctx.rotate(-0.25);
-  const g = ctx.createRadialGradient(-r * 0.35, -r * 0.3, r * 0.1, 0, 0, r * 1.25);
-  g.addColorStop(0, '#c08a4c');
-  g.addColorStop(0.6, '#8a5a2c');
-  g.addColorStop(1, '#5a3818');
-  // bills peeking out when the haul is big
-  if (r > 15) {
-    for (let i = 0; i < 4; i++) {
-      ctx.save();
-      ctx.translate(r * 0.45 + i * 2.5, -r * 0.82 - i * 1.5);
-      ctx.rotate(-0.6 + i * 0.35 + Math.sin(t * 7 + i) * 0.08);
-      ctx.fillStyle = '#7fc98a';
-      ctx.strokeStyle = '#2f6b3a';
-      ctx.lineWidth = 1;
-      ctx.fillRect(-3, -8, 7, 11);
-      ctx.strokeRect(-3, -8, 7, 11);
-      ctx.restore();
-    }
+  ctx.rotate(-0.22);
+  // cash bundles spilling out of the top
+  const n = 2 + Math.round(fill * 5);
+  for (let i = 0; i < n; i++) {
+    const a = -0.85 + (i / Math.max(1, n - 1)) * 1.7;
+    ctx.save();
+    ctx.translate(Math.sin(a) * r * 0.32, -r * 1.02 - Math.cos(a) * r * 0.12);
+    ctx.rotate(a * 0.7 + Math.sin(t * 6 + i) * 0.05);
+    const bw = r * 0.34, bh = r * 0.6;
+    ctx.fillStyle = INK;
+    ctx.fillRect(-bw / 2 - 1, -bh - 1, bw + 2, bh + 2);
+    ctx.fillStyle = i % 3 === 0 ? '#a8e6b0' : '#7fc98a';
+    ctx.fillRect(-bw / 2, -bh, bw, bh);
+    ctx.fillStyle = 'rgba(40,90,50,0.55)';
+    ctx.fillRect(-bw / 2, -bh, bw, bh * 0.12);
+    ctx.fillStyle = '#3f7d4a';
+    ctx.beginPath(); ctx.arc(0, -bh * 0.6, bw * 0.2, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#efe2a8';
+    ctx.fillRect(-bw / 2, -bh * 0.35, bw, bh * 0.1);
+    ctx.restore();
   }
-  ctx.fillStyle = g;
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = 2.2;
-  ctx.beginPath();
-  ctx.moveTo(r * 0.35, -r * 0.92);
-  ctx.bezierCurveTo(r * 1.25, -r * 0.6, r * 1.15, r * 0.95, 0, r * 0.98);
-  ctx.bezierCurveTo(-r * 1.2, r * 0.95, -r * 1.25, -r * 0.55, -r * 0.3, -r * 0.92);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  // burlap texture
-  ctx.strokeStyle = 'rgba(60,35,10,0.25)';
-  ctx.lineWidth = 1;
-  for (let i = -2; i <= 2; i++) {
+  // gold coins on top
+  for (let i = 0; i < 1 + Math.round(fill * 4); i++) {
+    const cx = -r * 0.32 + i * r * 0.17, cy = -r * 1.05 - (i % 2) * r * 0.08;
+    ctx.fillStyle = INK;
+    ctx.beginPath(); ctx.ellipse(cx, cy, r * 0.14, r * 0.12, 0, 0, TAU); ctx.fill();
+    const cg = ctx.createRadialGradient(cx - r * 0.04, cy - r * 0.04, 0, cx, cy, r * 0.13);
+    cg.addColorStop(0, '#fff3b8'); cg.addColorStop(0.5, '#f7c948'); cg.addColorStop(1, '#b07a14');
+    ctx.fillStyle = cg;
+    ctx.beginPath(); ctx.ellipse(cx, cy, r * 0.11, r * 0.095, 0, 0, TAU); ctx.fill();
+  }
+  // the sack
+  const sack = () => {
     ctx.beginPath();
-    ctx.moveTo(i * r * 0.3, -r * 0.6);
-    ctx.quadraticCurveTo(i * r * 0.38, 0, i * r * 0.3, r * 0.8);
-    ctx.stroke();
-  }
-  // tied neck
-  ctx.fillStyle = '#6a4420';
+    ctx.moveTo(-r * 0.32, -r * 0.92);
+    ctx.bezierCurveTo(-r * 0.55, -r * 0.6, -r * 1.25, -r * 0.35, -r * 1.12, r * 0.35);
+    ctx.bezierCurveTo(-r * 1.02, r * 1.05, -r * 0.35, r * 1.14, 0, r * 1.06);
+    ctx.bezierCurveTo(r * 0.4, r * 1.14, r * 1.05, r * 1.0, r * 1.12, r * 0.3);
+    ctx.bezierCurveTo(r * 1.22, -r * 0.4, r * 0.55, -r * 0.6, r * 0.32, -r * 0.92);
+    ctx.closePath();
+  };
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 2.6;
   ctx.strokeStyle = INK;
-  ctx.lineWidth = 1.6;
-  rr(ctx, -r * 0.32, -r * 1.12, r * 0.7, r * 0.28, 3);
-  ctx.fill();
+  sack();
   ctx.stroke();
-  ctx.fillStyle = '#d9a441';
-  ctx.fillRect(-r * 0.36, -r * 0.95, r * 0.78, r * 0.12);
-  // $ stamp
-  ctx.fillStyle = '#ffd56a';
-  ctx.strokeStyle = 'rgba(60,30,0,0.6)';
+  const g = ctx.createRadialGradient(-r * 0.35, -r * 0.2, r * 0.1, 0, r * 0.2, r * 1.3);
+  g.addColorStop(0, '#d9ab68');
+  g.addColorStop(0.55, '#a8743a');
+  g.addColorStop(1, '#5e3a18');
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.save();
+  sack();
+  ctx.clip();
+  // burlap weave
+  ctx.strokeStyle = 'rgba(70,40,12,0.18)';
+  ctx.lineWidth = 0.8;
+  for (let k = -r * 1.3; k < r * 1.3; k += r * 0.16) {
+    ctx.beginPath(); ctx.moveTo(k, -r); ctx.lineTo(k + r * 0.25, r * 1.2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-r * 1.3, k * 0.9); ctx.lineTo(r * 1.3, k * 0.9 + r * 0.1); ctx.stroke();
+  }
+  // shadow under the bulge
+  ctx.fillStyle = 'rgba(40,20,5,0.25)';
+  ctx.beginPath(); ctx.ellipse(r * 0.2, r * 1.0, r * 1.1, r * 0.35, 0, 0, TAU); ctx.fill();
+  // patch with cross stitches
+  ctx.fillStyle = '#7a5226';
+  ctx.fillRect(-r * 0.9, r * 0.35, r * 0.38, r * 0.34);
+  ctx.strokeStyle = 'rgba(240,220,170,0.75)';
+  ctx.lineWidth = 0.9;
+  for (let k = 0; k < 3; k++) {
+    const yy = r * 0.42 + k * r * 0.1;
+    ctx.beginPath(); ctx.moveTo(-r * 0.92, yy); ctx.lineTo(-r * 0.86, yy + r * 0.05); ctx.moveTo(-r * 0.86, yy); ctx.lineTo(-r * 0.92, yy + r * 0.05); ctx.stroke();
+  }
+  ctx.restore();
+  // stitched side seam
+  ctx.setLineDash([2.2, 2]);
+  ctx.strokeStyle = 'rgba(245,225,175,0.6)';
   ctx.lineWidth = 1;
-  ctx.font = `900 ${Math.round(r * 1.05)}px Georgia, serif`;
+  ctx.beginPath(); ctx.moveTo(r * 0.5, -r * 0.6); ctx.bezierCurveTo(r * 0.95, -r * 0.2, r * 0.95, r * 0.6, r * 0.45, r * 0.95); ctx.stroke();
+  ctx.setLineDash([]);
+  // gold $ badge
+  const cx = r * 0.08, cy = r * 0.28, br = r * 0.46;
+  ctx.fillStyle = INK;
+  ctx.beginPath(); ctx.arc(cx, cy, br + 1.4, 0, TAU); ctx.fill();
+  const gb = ctx.createRadialGradient(cx - br * 0.35, cy - br * 0.35, 0, cx, cy, br);
+  gb.addColorStop(0, '#fff3b8'); gb.addColorStop(0.55, '#f2c14e'); gb.addColorStop(1, '#a8700f');
+  ctx.fillStyle = gb;
+  ctx.beginPath(); ctx.arc(cx, cy, br, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(110,70,10,0.7)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(cx, cy, br * 0.78, 0, TAU); ctx.stroke();
+  ctx.fillStyle = '#5a3a08';
+  ctx.font = `900 ${Math.round(br * 1.25)}px Georgia, serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('$', 0, r * 0.12);
-  ctx.strokeText('$', 0, r * 0.12);
-  // glint
+  ctx.fillText('$', cx, cy + br * 0.06);
   const gl = (Math.sin(t * 3) + 1) / 2;
-  ctx.fillStyle = `rgba(255,255,230,${0.25 + gl * 0.5})`;
+  ctx.fillStyle = `rgba(255,255,240,${0.35 + gl * 0.55})`;
   ctx.beginPath();
-  ctx.ellipse(-r * 0.45, -r * 0.35, r * 0.18, r * 0.09, -0.6, 0, TAU);
+  const sx0 = cx - br * 0.45, sy0 = cy - br * 0.45, sr = br * (0.25 + gl * 0.15);
+  ctx.moveTo(sx0, sy0 - sr); ctx.lineTo(sx0 + sr * 0.25, sy0 - sr * 0.25); ctx.lineTo(sx0 + sr, sy0); ctx.lineTo(sx0 + sr * 0.25, sy0 + sr * 0.25);
+  ctx.lineTo(sx0, sy0 + sr); ctx.lineTo(sx0 - sr * 0.25, sy0 + sr * 0.25); ctx.lineTo(sx0 - sr, sy0); ctx.lineTo(sx0 - sr * 0.25, sy0 - sr * 0.25);
+  ctx.closePath();
   ctx.fill();
+  // gathered neck with a gold rope tie
+  ctx.strokeStyle = 'rgba(60,32,10,0.6)';
+  ctx.lineWidth = 1;
+  for (const k of [-0.18, 0, 0.18]) { ctx.beginPath(); ctx.moveTo(k * r, -r * 0.88); ctx.lineTo(k * r * 1.6, -r * 0.62); ctx.stroke(); }
+  ctx.fillStyle = INK;
+  rr(ctx, -r * 0.4, -r * 1.02, r * 0.8, r * 0.2, r * 0.08); ctx.fill();
+  ctx.fillStyle = '#e0b04a';
+  rr(ctx, -r * 0.36, -r * 0.99, r * 0.72, r * 0.14, r * 0.06); ctx.fill();
+  ctx.strokeStyle = 'rgba(120,80,10,0.8)';
+  for (let k = -0.3; k < 0.36; k += 0.1) { ctx.beginPath(); ctx.moveTo(k * r, -r * 0.99); ctx.lineTo(k * r + r * 0.05, -r * 0.85); ctx.stroke(); }
+  // paper tag with the bet's live value
+  if (o.tag) {
+    const swing = Math.sin(t * 5) * 0.12;
+    ctx.save();
+    ctx.translate(r * 0.34, -r * 0.92);
+    ctx.rotate(0.22 + swing);
+    ctx.strokeStyle = '#e0b04a';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(r * 0.35, r * 0.45); ctx.stroke();
+    const fs = Math.max(6, r * 0.42);
+    ctx.font = `800 ${fs}px "Chakra Petch", system-ui, sans-serif`;
+    const tw = ctx.measureText(o.tag).width + fs * 0.8;
+    ctx.translate(r * 0.35, r * 0.45);
+    ctx.fillStyle = INK;
+    rr(ctx, -1, -1, tw + 2, fs * 1.45 + 2, 2.5); ctx.fill();
+    ctx.fillStyle = '#f7f0d8';
+    rr(ctx, 0, 0, tw, fs * 1.45, 2); ctx.fill();
+    ctx.fillStyle = '#c9b98a';
+    ctx.beginPath(); ctx.arc(fs * 0.35, fs * 0.72, fs * 0.14, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#1f6b3a';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(o.tag, fs * 0.6, fs * 0.76);
+    ctx.restore();
+  }
   ctx.restore();
 }
 
@@ -511,14 +591,14 @@ export function drawPerson(ctx, x, y, sc, o) {
   drawLeg(Math.PI, shade(f.pants));
   let bagPos = null;
   if (o.bag) {
-    const bx = sx - 8 - o.bag * 0.7, by = sy + 6 + (moving ? Math.sin(ph * 2) * 2.4 : 0) + (pose === 'slide' ? 10 : 0);
-    drawBag(ctx, bx, by, o.bag, t);
+    const bx = sx - 6 - o.bag * 0.78, by = sy + o.bag * 0.2 + (moving ? Math.sin(ph * 2) * 2.4 : 0) + (pose === 'slide' ? 10 : 0);
+    drawBag(ctx, bx, by, o.bag, t, { fill: o.bagFill, tag: o.bagTag });
     bagPos = [bx, by];
-    hiLimb(ctx, [[sx, sy], [sx - 2, sy + 4], [bx + o.bag * 0.25, by - o.bag * 1.0]], 8.5, shade(f.sleeve, 0.85));
+    hiLimb(ctx, [[sx, sy], [sx - 2, sy + 4], [bx - o.bag * 0.02, by - o.bag * 0.98]], 8.5, shade(f.sleeve, 0.85));
     ctx.fillStyle = INK;
-    ctx.beginPath(); ctx.arc(bx + o.bag * 0.25, by - o.bag * 1.0, 6.2, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(bx - o.bag * 0.02, by - o.bag * 0.98, 6.2, 0, TAU); ctx.fill();
     ctx.fillStyle = f.glove || f.skin;
-    ctx.beginPath(); ctx.arc(bx + o.bag * 0.25, by - o.bag * 1.0, 4.8, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(bx - o.bag * 0.02, by - o.bag * 0.98, 4.8, 0, TAU); ctx.fill();
   } else {
     drawArm(1, shade(f.sleeve));
   }

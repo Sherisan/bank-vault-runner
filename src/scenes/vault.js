@@ -563,7 +563,7 @@ export function createVaultScene() {
   let zones = [{ start: -1e12, type: 'vault' }];
   let traps = [], nextTrapX = 0, action = null;
   let collected = new Set();
-  let chasers = [], car = null, moto = null, heliOn = 0, bagR = 10, coinAcc = 0, billAcc = 0;
+  let chasers = [], car = null, moto = null, heliOn = 0, bagR = 15, coinAcc = 0, billAcc = 0;
   let shake = 0, flash = 0, banner = null, lastHere = 'vault', rain = 0, slamDone = false;
   let bagAt = null; // where the loot bag was drawn last frame: pickups fly into it
   let heliT0 = 0, heliLock = 0, heliSpot = null, spotted = false, car2 = null, cuffed = false;
@@ -640,7 +640,7 @@ export function createVaultScene() {
         if (v.phase === 'betting') {
           fx.clear();
           zones = [{ start: -1e12, type: 'vault' }];
-          traps = []; chasers = []; car = null; moto = null; car2 = null; heliOn = 0; bagR = 10; banner = null; lastHere = 'vault';
+          traps = []; chasers = []; car = null; moto = null; car2 = null; heliOn = 0; bagR = 15; banner = null; lastHere = 'vault';
         }
         lastPhase = v.phase;
         lastRound = v.roundId;
@@ -960,8 +960,8 @@ export function createVaultScene() {
       }
 
       /* the robber */
-      if (running) bagR = lerp(bagR, 13 + Math.min(14, Math.log(v.mult) * 6), Math.min(1, dt * 3));
-      if (crashed) drawBag(ctx, rx + 44 * sc, gy - bagR * sc * 0.9, bagR * sc, time);
+      if (running) bagR = lerp(bagR, 15 + Math.min(15, Math.log(v.mult) * 6), Math.min(1, dt * 3));
+      if (crashed) drawBag(ctx, rx + 46 * sc, gy - bagR * sc * 1.05, bagR * sc, time, { fill: 1 });
       // motion streaks behind him at speed
       if (running && speed > w * 0.55 && !reduced) {
         ctx.save();
@@ -990,6 +990,8 @@ export function createVaultScene() {
       const r = drawPerson(ctx, rx + dashOff + shakeX, gy + jumpY, sc * 0.88, {
         pose, ph, t: time, outfit: OUTFITS.robber,
         bag: crashed ? 0 : bagR,
+        bagFill: clamp(Math.log(Math.max(1, v.mult)) / Math.log(20), 0, 1),
+        bagTag: running && v.stake > 0 ? '+' + (v.stake * v.mult).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : null,
         item: null,
       });
       bagAt = crashed ? null : [r.bagX, r.bagY];
