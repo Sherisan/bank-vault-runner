@@ -69,20 +69,25 @@ export default function Stage({ game, engine, mini = false }) {
     <div className={`stage${mini ? ' mini' : ''}`} data-phase={snap.phase} ref={wrapRef}>
       <canvas ref={canvasRef} aria-hidden="true" />
       <div className="stage-overlay" aria-hidden="true">
-        {snap.phase === 'betting' && (
+        {snap.conn !== 'online' && (
+          <div className="ov-wait">
+            <span className="ov-label">{snap.connMessage || 'Connecting to the game server…'}</span>
+          </div>
+        )}
+        {snap.conn === 'online' && snap.phase === 'betting' && (
           <div className="ov-wait">
             <span className="ov-label">{game.waitLabel}</span>
             <span className="ov-count" ref={countRef}>6.0s</span>
             {!mini && <span className="ov-bar"><i ref={barRef} /></span>}
           </div>
         )}
-        {snap.phase === 'running' && (
+        {snap.conn === 'online' && snap.phase === 'running' && (
           <div className="ov-run">
             {!mini && <span className="ov-label">{game.runningLabel}</span>}
             <span className="ov-mult" ref={multRef} data-tier="low">1.00×</span>
           </div>
         )}
-        {snap.phase === 'crashed' && cp !== null && (
+        {snap.conn === 'online' && snap.phase === 'crashed' && cp !== null && (
           <div className="ov-crash">
             <span className="ov-verb">{game.crashVerb}</span>
             <span className="ov-mult crashed">{cp.toFixed(2)}×</span>

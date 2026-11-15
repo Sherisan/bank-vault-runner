@@ -1,5 +1,5 @@
 import { useBalance, useMuted, money } from '../hooks';
-import { wallet, START_BALANCE } from '../engine/wallet';
+import { wallet } from '../engine/wallet';
 import { sound, unlockAudio } from '../engine/sound';
 
 function SoundIcon({ muted }) {
@@ -29,14 +29,9 @@ export default function TopBar() {
       </nav>
       <div className="wallet">
         <div className="balance" aria-live="polite">
-          <span className="bal-label">Demo balance</span>
-          <span className="bal-amount">{money(balance)}</span>
+          <span className="bal-label">Balance{wallet.currency() ? ` (${wallet.currency()})` : ''}</span>
+          <span className="bal-amount">{balance === null ? '—' : money(balance)}</span>
         </div>
-        {balance < 10 && (
-          <button className="refill" onClick={() => { unlockAudio(); wallet.reset(); }}>
-            Refill to {money(START_BALANCE)}
-          </button>
-        )}
         <button className="icon-btn" onClick={() => { unlockAudio(); sound.toggle(); }} aria-pressed={!muted} aria-label={muted ? 'Turn sound on' : 'Turn sound off'}>
           <SoundIcon muted={muted} />
         </button>

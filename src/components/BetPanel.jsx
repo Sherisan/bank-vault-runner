@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { useEngine, useBalance, money } from '../hooks';
-import { MIN_BET, MAX_BET } from '../engine/engine';
 import { unlockAudio } from '../engine/sound';
 
 const r2 = (n) => Math.round(n * 100) / 100;
@@ -41,7 +40,8 @@ export default function BetPanel({ engine, slot, index }) {
   const [autoDraft, setAutoDraft] = useState(b.autoCashAt.toFixed(2));
   const [editing, setEditing] = useState(false);
   const [editingAuto, setEditingAuto] = useState(false);
-  const locked = b.status !== 'idle';
+  const locked = b.status !== 'idle' || b.busy;
+  const short = balance !== null && b.amount > balance;
   const uid = `${engine.id}-${slot}`;
 
   useEffect(() => { if (!editing) setDraft(b.amount.toFixed(2)); }, [b.amount, editing]);
@@ -49,7 +49,7 @@ export default function BetPanel({ engine, slot, index }) {
 
   const setAmount = (n) => {
     if (!Number.isFinite(n)) n = b.amount;
-    engine.configure(slot, { amount: clamp(r2(n), MIN_BET, MAX_BET) });
+    engine.configure(slot, { amount: clamp(r2(n), s.limits.minBet, s.limits.maxBet) });
   };
   const commitDraft = () => {
     setEditing(false);
@@ -59,7 +59,7 @@ export default function BetPanel({ engine, slot, index }) {
     setEditingAuto(false);
     let n = parseFloat(autoDraft.replace(',', '.'));
     if (!Number.isFinite(n)) n = b.autoCashAt;
-    engine.configure(slot, { autoCashAt: clamp(r2(n), 1.01, 1000) });
+    engine.configure(slot, { autoCashAt: clamp(r2(n), s.limits.minAutoCashOut, s.limits.maxMultiplier) });
   };
 
   const act = () => {
@@ -81,14 +81,14 @@ export default function BetPanel({ engine, slot, index }) {
     button = (
       <button className="btn btn-main btn-cancel" onClick={act} data-slot={slot}>
         <span className="btn-verb">Cancel bet</span>
-        <small>{s.phase === 'betting' ? `${money(b.stake)} in this round` : 'Waiting for the next round'}</small>
+        <small>{s.phase === 'betting' && !b.queued ? `${money(b.stake)} in this round` : 'Waiting for the next round'}</small>
       </button>
     );
   } else {
     button = (
-      <button className="btn btn-main btn-bet" onClick={act} data-slot={slot} disabled={b.amount > balance}>
+      <button className="btn btn-main btn-bet" onClick={act} data-slot={slot} disabled={short || b.busy || s.conn !== 'online'}>
         <span className="btn-verb">Bet {money(b.amount)}</span>
-        <small>{b.amount > balance ? 'Not enough credits' : s.phase === 'betting' ? 'Joins this round' : 'Joins the next round'}</small>
+        <small>{s.conn !== 'online' ? 'Connecting…' : short ? 'Not enough balance' : s.phase === 'betting' ? 'Joins this round' : 'Joins the next round'}</small>
       </button>
     );
   }
