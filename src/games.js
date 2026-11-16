@@ -7,5 +7,11 @@ export const GAME = {
   waitLabel: 'Hacking the vault',
   crashVerb: 'Busted',
   runningLabel: 'Loot multiplier',
+  // where the chase moves as the multiplier climbs (matches the scene's zones)
+  milestones: [
+    { at: 1.6, name: 'Grand Hall' },
+    { at: 3.2, name: 'City Streets' },
+    { at: 8, name: 'Rooftops' },
+  ],
   scene: createVaultScene,
 };

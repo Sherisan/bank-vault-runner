@@ -568,6 +568,7 @@ export function createVaultScene() {
   let bagAt = null; // where the loot bag was drawn last frame: pickups fly into it
   let heliT0 = 0, heliLock = 0, heliSpot = null, spotted = false, car2 = null, cuffed = false;
   let dashT = -10, crashCause = 'police', caughtTrap = null;
+  let seenWin, pops = [], cashGlow = 0; // the player's cash-outs
   const fx = particles();
 
   const zoneAt = (wx) => {
@@ -640,10 +641,33 @@ export function createVaultScene() {
         if (v.phase === 'betting') {
           fx.clear();
           zones = [{ start: -1e12, type: 'vault' }];
-          traps = []; chasers = []; car = null; moto = null; car2 = null; heliOn = 0; bagR = 15; banner = null; lastHere = 'vault';
+          traps = []; chasers = []; car = null; moto = null; car2 = null; heliOn = 0; bagR = 15; banner = null; lastHere = 'vault'; pops = [];
         }
         lastPhase = v.phase;
         lastRound = v.roundId;
+      }
+
+      /* the player cashed out: loot bursts from the bag and the win floats up */
+      const wseq = v.win ? v.win.seq : 0;
+      if (seenWin === undefined) seenWin = wseq;
+      else if (v.win && wseq !== seenWin) {
+        seenWin = wseq;
+        pops.push({ amount: v.win.amount, at: v.win.at, t0: time });
+        if (pops.length > 2) pops.shift();
+        cashGlow = 1;
+        const bx = bagAt ? bagAt[0] : rx, by = bagAt ? bagAt[1] : gy - 60 * sc;
+        for (let i = 0; i < (reduced ? 6 : 28); i++) {
+          fx.add({ kind: 'coin', x: bx, y: by, vx: (Math.random() - 0.5) * w * 0.32, vy: -h * (0.55 + Math.random() * 0.75), g: h * 2.6, life: 1.9, bounce: 0.4, rot: Math.random() * 6, vr: 10 + Math.random() * 8, r: h * 0.012, floor: gy + (Math.random() - 0.5) * h * 0.03, scroll: 0.5 });
+        }
+        for (let i = 0; i < (reduced ? 3 : 12); i++) {
+          fx.add({ kind: 'bill', x: bx, y: by, vx: (Math.random() - 0.5) * w * 0.3, vy: -h * (0.35 + Math.random() * 0.4), g: h * 0.35, drag: 1.2, life: 2.4, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 8, r: h * 0.018, scroll: 0.4 });
+        }
+        if (!reduced) {
+          for (let i = 0; i < 26; i++) {
+            const a = Math.random() * TAU, sp = h * (0.45 + Math.random() * 0.7);
+            fx.add({ kind: 'spark', x: bx, y: by, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: h * 0.8, life: 0.55 });
+          }
+        }
       }
 
       const running = v.phase === 'running';
@@ -1230,6 +1254,75 @@ export function createVaultScene() {
       if (flash > 0) {
         ctx.fillStyle = `rgba(255,245,220,${flash})`;
         ctx.fillRect(0, 0, w, h);
+      }
+
+      // cash-out: a golden burst around the robber and the win floats above him
+      cashGlow = Math.max(0, cashGlow - dt * 1.4);
+      if (cashGlow > 0) {
+        const cy = gy - 60 * sc;
+        const gg = ctx.createRadialGradient(rx, cy, 0, rx, cy, h * 0.55);
+        gg.addColorStop(0, `rgba(255,215,110,${0.32 * cashGlow})`);
+        gg.addColorStop(1, 'rgba(255,215,110,0)');
+        ctx.fillStyle = gg;
+        ctx.fillRect(rx - h * 0.55, cy - h * 0.55, h * 1.1, h * 1.1);
+        if (!reduced) {
+          const k = 1 - cashGlow;
+          ctx.strokeStyle = `rgba(255,226,140,${cashGlow * 0.9})`;
+          ctx.lineWidth = Math.max(2, h * 0.012 * cashGlow);
+          ctx.beginPath(); ctx.arc(rx, cy, h * (0.06 + easeOut(k) * 0.42), 0, TAU); ctx.stroke();
+        }
+      }
+      for (let i = pops.length - 1; i >= 0; i--) {
+        const p = pops[i], t = time - p.t0;
+        if (t > 2.4) { pops.splice(i, 1); continue; }
+        const a = clamp(t / 0.12, 0, 1) * clamp((2.4 - t) / 0.5, 0, 1);
+        const pop = reduced ? 1 : t < 0.4 ? Math.max(0.01, easeOutBack(t / 0.4)) : 1;
+        const fs = Math.max(20, Math.round(h * 0.08));
+        const px = clamp(rx, fs * 3.2, w - fs * 3.2);
+        const py = h * 0.36 - (reduced ? 0 : easeOut(t / 2.4) * h * 0.07) - (pops.length - 1 - i) * fs * 1.7;
+        const amount = '+' + p.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const label = 'CASHED OUT  ' + p.at.toFixed(2) + '×';
+        ctx.save();
+        ctx.globalAlpha = a;
+        ctx.translate(px, py);
+        ctx.scale(pop, pop);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const ls = Math.round(fs * 0.3);
+        ctx.font = `700 ${ls}px "Chakra Petch", system-ui, sans-serif`;
+        const lw = ctx.measureText(label).width + ls * 1.6;
+        ctx.fillStyle = 'rgba(8,12,14,0.78)';
+        rr(ctx, -lw / 2, -fs * 1.12, lw, ls * 1.7, ls * 0.85);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,210,120,0.55)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = '#ffe9b0';
+        ctx.fillText(label, 0, -fs * 1.12 + ls * 0.88);
+        ctx.font = `400 ${fs}px "Bungee", Impact, sans-serif`;
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = fs * 0.18;
+        ctx.strokeStyle = 'rgba(40,22,0,0.9)';
+        ctx.strokeText(amount, 0, fs * 0.04);
+        const tg = ctx.createLinearGradient(0, -fs * 0.45, 0, fs * 0.5);
+        tg.addColorStop(0, '#ffffff');
+        tg.addColorStop(0.45, '#ffe08a');
+        tg.addColorStop(1, '#e0a028');
+        ctx.fillStyle = tg;
+        ctx.fillText(amount, 0, 0);
+        // a glint sweeps across the number
+        if (!reduced && t > 0.3 && t < 1.1) {
+          const tw = ctx.measureText(amount).width;
+          const gx = lerp(-tw * 0.7, tw * 0.7, (t - 0.3) / 0.8);
+          ctx.globalCompositeOperation = 'source-atop';
+          const sg = ctx.createLinearGradient(gx - fs * 0.5, 0, gx + fs * 0.5, 0);
+          sg.addColorStop(0, 'rgba(255,255,255,0)');
+          sg.addColorStop(0.5, 'rgba(255,255,255,0.85)');
+          sg.addColorStop(1, 'rgba(255,255,255,0)');
+          ctx.fillStyle = sg;
+          ctx.fillText(amount, 0, 0);
+        }
+        ctx.restore();
       }
 
       // zone banner

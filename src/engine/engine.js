@@ -48,6 +48,7 @@ export function createEngine(id, label) {
     limits: { minBet: 1, maxBet: 10000, maxWin: 500000, minAutoCashOut: 1.01, maxMultiplier: 1000, slots: 2 },
     fairness: { hash: '', nonce: null, prevSeed: '', prevHash: '' },
     me: '',
+    lastWin: null,
   };
   const settled = new Set();
   let audible = false;
@@ -140,6 +141,7 @@ export function createEngine(id, label) {
     const b = st.bets[k];
     if (b.betId === betId) { b.status = 'idle'; b.betId = null; b.stake = 0; }
     b.last = { type: 'win', amount: win, at, stake };
+    st.lastWin = { seq: (st.lastWin?.seq ?? 0) + 1, amount: win, at };
     record(k, { stake, at, win, round });
     play('cash');
     toast({ kind: 'win', game: label, text: `Cashed out ${win.toFixed(2)} at ${at.toFixed(2)}×` });
@@ -310,6 +312,7 @@ export function createEngine(id, label) {
         betLeft: st.phase === 'betting' ? Math.max(0, BET_MS / 1000 - tPhase) : 0,
         betProgress: st.phase === 'betting' ? Math.min(1, tPhase / (BET_MS / 1000)) : 0,
         roundId: st.roundId,
+        win: st.lastWin,
         stake: ['A', 'B'].reduce((sum, k) => sum + (st.bets[k].status === 'live' ? st.bets[k].stake : 0), 0),
       };
     },

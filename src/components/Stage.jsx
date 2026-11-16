@@ -7,6 +7,8 @@ export default function Stage({ game, engine, mini = false }) {
   const multRef = useRef(null);
   const countRef = useRef(null);
   const barRef = useRef(null);
+  const nextRef = useRef(null);
+  const nextBarRef = useRef(null);
   const snap = useEngine(engine);
   const reduced = useReducedMotion();
   const reducedRef = useRef(reduced);
@@ -17,7 +19,8 @@ export default function Stage({ game, engine, mini = false }) {
     const wrap = wrapRef.current;
     const ctx = canvas.getContext('2d');
     const scene = game.scene();
-    let w = 0, h = 0, dpr = 1, raf = 0, last = performance.now(), visible = true;
+    let w = 0, h = 0, dpr = 1, raf = 0, last = performance.now(), visible = true, nextText = '';
+    const stops = game.milestones || [];
 
     const resize = () => {
       const r = wrap.getBoundingClientRect();
@@ -52,6 +55,14 @@ export default function Stage({ game, engine, mini = false }) {
         multRef.current.textContent = (Math.floor(v.mult * 100) / 100).toFixed(2) + '×';
         multRef.current.dataset.tier = tier(v.mult);
       }
+      if (nextRef.current && v.phase === 'running' && stops.length) {
+        const i = stops.findIndex((z) => z.at > v.mult);
+        const prev = i > 0 ? stops[i - 1].at : i === -1 ? stops[stops.length - 1].at : 1;
+        const txt = i === -1 ? 'Top of the city' : `Next: ${stops[i].name} ${stops[i].at.toFixed(2)}×`;
+        if (txt !== nextText) { nextText = txt; nextRef.current.textContent = txt; }
+        const p = i === -1 ? 1 : Math.log(v.mult / prev) / Math.log(stops[i].at / prev);
+        if (nextBarRef.current) nextBarRef.current.style.transform = `scaleX(${Math.max(0, Math.min(1, p))})`;
+      }
       if (countRef.current && v.phase === 'betting') countRef.current.textContent = v.betLeft.toFixed(1) + 's';
       if (barRef.current && v.phase === 'betting') barRef.current.style.transform = `scaleX(${1 - v.betProgress})`;
     };
@@ -85,6 +96,12 @@ export default function Stage({ game, engine, mini = false }) {
           <div className="ov-run">
             {!mini && <span className="ov-label">{game.runningLabel}</span>}
             <span className="ov-mult" ref={multRef} data-tier="low">1.00×</span>
+            {!mini && game.milestones && (
+              <span className="ov-next">
+                <em ref={nextRef}>Next: {game.milestones[0].name} {game.milestones[0].at.toFixed(2)}×</em>
+                <span className="ov-bar"><i ref={nextBarRef} /></span>
+              </span>
+            )}
           </div>
         )}
         {snap.conn === 'online' && snap.phase === 'crashed' && cp !== null && (
